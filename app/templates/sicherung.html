@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Sicherung</h1>
+<div class="card">
+  <h2>Was gesichert wird</h2>
+  <p>Die ganze Datenbank des Simulators: Objekte mit ihren Melderlisten, Benutzer mit Rechten und die Übungsprotokolle.</p>
+  <p class="hint">Die Datei enthält die Benutzernamen und die Hashes der Passwörter, also nicht offen ablegen. Die Anleitung zur Wiederherstellung liegt jeder Sicherung als LIESMICH.txt bei.</p>
+  <form method="post" action="/sicherung/herunterladen">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="actions"><button>Sicherung jetzt herunterladen</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="row"><h2>Auf dem Server</h2>
+    <form method="post" action="/sicherung/ablegen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="light">Jetzt auf dem Server sichern</button></form></div>
+  <p class="hint">Ablage in <code>{{ folder }}</code>. {% if hours %}Der Simulator legt dort zusätzlich alle {{ hours }} Stunden von selbst eine Sicherung ab.{% else %}Die automatische Sicherung ist abgeschaltet.{% endif %} Es bleiben die neuesten {{ keep }} Dateien, ältere werden gelöscht.</p>
+  <table>
+    <tr><th>Datei</th><th>Erstellt</th><th>Größe</th><th></th></tr>
+    {% for i in items %}
+    <tr><td><a href="/sicherung/datei/{{ i.name }}"><strong>{{ i.name }}</strong></a>{% if i.auto %} <span class="tag">automatisch</span>{% endif %}</td>
+      <td>{{ i.ts|localtime }}</td><td>{{ '%.0f'|format(i.size / 1024) }} kB</td>
+      <td class="r"><a class="btn light klein" href="/sicherung/datei/{{ i.name }}">Herunterladen</a>
+        <form class="inline" method="post" action="/sicherung/datei/{{ i.name }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Sicherung {{ i.name }} löschen?">Löschen</button></form></td></tr>
+    {% else %}<tr><td colspan="4">Noch keine Sicherung abgelegt.</td></tr>{% endfor %}
+  </table>
+  <p class="hint">Diese Dateien liegen im selben Container wie der Simulator. Gegen einen Verlust des Containers schützt nur eine Kopie außerhalb: heruntergeladen oder über die Sicherung des Containers in Proxmox.</p>
+</div>
+<script src="/static/frage.js?v=1"></script>
+{% endblock %}

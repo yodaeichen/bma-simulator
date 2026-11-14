@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+{% set editing = target and target.id %}
+<h1>{{ 'Benutzer bearbeiten: ' ~ target.username if editing else 'Benutzer anlegen' }}</h1>
+{% if link %}
+<div class="card einladung">
+  <h2>Link zum Festlegen des Passworts</h2>
+  <p>Gib diesen Link an <strong>{{ target.username }}</strong> weiter. Er gilt {{ hours }} Stunden, funktioniert einmal und wird hier nicht noch einmal angezeigt.</p>
+  <code id="einladung-link">{{ link }}</code>
+</div>
+{% endif %}
+<form method="post" action="/benutzer/speichern" autocomplete="off" id="user-form">
+<div class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if editing %}<input type="hidden" name="id" value="{{ target.id }}">{% else %}
+  <label for="username">Benutzername</label><input type="text" id="username" name="username" maxlength="80" required>{% endif %}
+  <label for="password">{{ 'Neues Passwort' if editing else 'Passwort' }}</label>
+  <input type="password" id="password" name="password" minlength="12" autocomplete="new-password">
+  <p class="hint">Mindestens 12 Zeichen.{{ ' Leer lassen, um das Passwort nicht zu ändern.' if editing else ' Leer lassen, um stattdessen einen Einmal-Link zu bekommen, über den der Benutzer sein Passwort selbst festlegt.' }}</p>
+</div>
+
+<div class="card">
+  <h2>Rechte</h2>
+  <label for="preset">Rolle als Vorlage</label>
+  <select id="preset" data-presets='{{ presets|tojson }}'>
+    <option value="">Einzelrechte wie unten eingestellt</option>
+    {% for key, name in role_names.items() %}<option value="{{ key }}" {{ 'selected' if tperms == presets[key] }}>{{ name }}: {{ role_hints[key] }}</option>{% endfor %}
+  </select>
+  <p class="hint">Eine Rolle füllt die Einzelrechte darunter aus. Du kannst sie danach einzeln anpassen; gespeichert wird immer das, was unten steht.</p>
+  <table class="rechte">
+    <tr><th>Bereich</th><th>Zugriff</th><th>Bedeutung</th></tr>
+    {% for area, label, levels, hint in areas %}
+    <tr><td><label for="p_{{ area }}">{{ label }}</label></td>
+      <td><select id="p_{{ area }}" name="p_{{ area }}" class="perm">{% for value, text in levels %}<option value="{{ value }}" {{ 'selected' if tperms[area] == value }}>{{ text }}</option>{% endfor %}</select></td>
+      <td class="detail">{{ hint }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Objekte</h2>
+  <label class="check"><input type="checkbox" name="all_objekte" id="all-objekte" {{ 'checked' if t_all }}> Alle Objekte, auch künftig angelegte</label>
+  <p class="hint">Ohne diesen Haken sieht der Benutzer nur die unten angekreuzten Objekte mit ihren Melderlisten, Übungen und Protokollen. Alle anderen sind für ihn unsichtbar. Ein Objekt, das er selbst anlegt, kommt von selbst dazu. Wer Benutzer verwalten darf, sieht immer alle Objekte.</p>
+  <div class="picklist" id="objekt-list">
+    {% for o in objekte %}<label class="check"><input type="checkbox" name="objekt" value="{{ o.id }}" {{ 'checked' if o.id in t_ids }}> {{ o.name }}</label>
+    {% else %}<span class="hint">Noch kein Objekt angelegt.</span>{% endfor %}
+  </div>
+  <div class="actions"><button>Speichern</button><a class="btn light" href="/benutzer">Abbrechen</a></div>
+</div>
+</form>
+{% if editing %}
+<div class="card">
+  <h2>Passwort vergessen oder Einladung erneuern</h2>
+  <form method="post" action="/benutzer/{{ target.id }}/einladung"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="light">Neuen Einmal-Link erzeugen</button></form>
+  <p class="hint">{% if pending %}Für diesen Benutzer ist ein Link offen. {% endif %}Der Link gilt {{ hours }} Stunden. Das bisherige Passwort bleibt gültig, bis der Benutzer ein neues festlegt. Ein früherer Link wird ungültig.</p>
+</div>
+{% endif %}
+<script src="/static/benutzer.js?v=1" defer></script>
+{% endblock %}

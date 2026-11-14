@@ -39,8 +39,17 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True)
     password_hash: Mapped[str] = mapped_column(String(200))
+    # Aus Version 1.0: nur noch Vorgabe für Konten ohne eigene Rechte (siehe access.py)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Rechte als JSON (siehe access.py). Leer = Konto aus Version 1.0, Rechte ergeben sich aus is_admin.
+    perms: Mapped[str | None] = mapped_column(Text, nullable=True)
+    all_objekte: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    objekt_ids: Mapped[str] = mapped_column(Text, default="", server_default="")  # freigegebene Objekt-IDs, mit Komma
+    # Einladung: nur der Hash des Einmal-Links wird gespeichert, mit Ablaufzeit
+    invite_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    invite_expires: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
     last_login: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)  # letzte Aktivität; leer nach dem Abmelden
 
 
 class Objekt(Base):
@@ -96,5 +105,28 @@ class Protokoll(Base):
     text: Mapped[str] = mapped_column(Text, default="")
 
 
+# Spalten, die nach Version 1.0 dazukamen: bestehende Datenbanken werden beim Start ergänzt.
+ADDED_COLUMNS = {
+    "users": {
+        "perms": "TEXT",
+        "all_objekte": "BOOLEAN NOT NULL DEFAULT 1",
+        "objekt_ids": "TEXT NOT NULL DEFAULT ''",
+        "invite_hash": "VARCHAR(64) NOT NULL DEFAULT ''",
+        "invite_expires": "DATETIME",
+        "last_seen": "DATETIME",
+    },
+}
+
+
+def add_missing_columns():
+    with engine.begin() as conn:
+        for table, columns in ADDED_COLUMNS.items():
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for name, ddl in columns.items():
+                if name not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 def init_db():
     Base.metadata.create_all(engine)
+    add_missing_columns()

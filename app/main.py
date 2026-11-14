@@ -1,6 +1,8 @@
 """Web-Oberfläche: Ausbilderansicht, Verwaltung der Objekte und die Anzeigen für die Übenden."""
+import asyncio
 import csv
 import datetime as dt
+import hashlib
 import hmac
 import io
 import json
@@ -14,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 import segno
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, func, select
@@ -22,7 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import db as m
-from . import katalog, sim
+from . import access, backup, katalog, live, sim
 from . import security as sec
 from .version import VERSION
 
@@ -33,6 +35,7 @@ BASE = os.path.dirname(__file__)
 TZ = ZoneInfo(os.environ.get("TZ", "Europe/Berlin"))
 LOG_KEEP = int(os.environ.get("LOG_KEEP", "2000"))  # Protokollzeilen je Objekt
 MAX_UPLOAD = 512 * 1024
+INVITE_HOURS = 48
 _state_lock = threading.Lock()  # genau ein Prozess: Zustandsänderungen laufen nacheinander
 
 
@@ -45,13 +48,27 @@ async def lifespan(_app):
             if len(password) < 12:
                 raise RuntimeError("ADMIN_PASSWORD fehlt oder ist kürzer als 12 Zeichen (siehe .env.example).")
             db.add(m.User(username=os.environ.get("ADMIN_USER", "admin"), password_hash=sec.hash_password(password),
-                          is_admin=True))
+                          is_admin=True, perms=json.dumps(access.PRESETS["admin"])))
             db.commit()
             log.info("Erster Benutzer wurde angelegt.")
             if os.environ.get("BEISPIELE", "true").lower() == "true":
                 log.info("%s Beispielobjekte angelegt.", katalog.beispiele_anlegen(db))
     log.info("BMA Simulator %s gestartet.", VERSION)
+    task = asyncio.create_task(sicherung_schleife())
     yield
+    task.cancel()
+
+
+async def sicherung_schleife():
+    """Tägliche Sicherung ohne Zutun (Abstand über BACKUP_HOURS, 0 = aus)."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            if await asyncio.to_thread(backup.auto_due):
+                log.info("Automatische Sicherung abgelegt: %s", await asyncio.to_thread(backup.store, True))
+        except Exception:
+            log.exception("Automatische Sicherung fehlgeschlagen")
+        await asyncio.sleep(600)
 
 
 app = FastAPI(title="BMA Simulator", version=VERSION, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -85,6 +102,16 @@ async def _login_required(request: Request, _exc):
     return RedirectResponse("/login", status_code=303)
 
 
+@app.exception_handler(access.Denied)
+async def _denied(request: Request, exc: access.Denied):
+    log.warning("Zugriff verweigert: %s %s", request.method, request.url.path)
+    if request.url.path.endswith(("/state", "/aktion")):
+        return JSONResponse({"detail": exc.message}, status_code=403)
+    response = templates.TemplateResponse(request, "verboten.html", {"message": exc.message, "user": None, "flash": None, "csrf": "", "perm": {}})
+    response.status_code = 403
+    return response
+
+
 def get_db():
     with m.SessionLocal() as db:
         yield db
@@ -95,13 +122,34 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> m.User:
     user = db.get(m.User, uid) if uid else None
     if not user:
         raise LoginRequired()
+    now = m.utcnow()
+    if user.last_seen is None or (now - user.last_seen).total_seconds() > 60:  # höchstens einmal je Minute schreiben
+        user.last_seen = now
+        db.commit()
     return user
 
 
-def admin_user(user: m.User = Depends(current_user)) -> m.User:
-    if not user.is_admin:
-        raise HTTPException(403, "Nur für Administratoren.")
-    return user
+def allow(*needs: str):
+    """Abhängigkeit für Seiten und Aktionen: angemeldet und mit den genannten Rechten, z. B. allow("uebung:2")."""
+    def dependency(request: Request, db: Session = Depends(get_db)) -> m.User:
+        user = current_user(request, db)
+        access.require(user, *needs)
+        return user
+    return dependency
+
+
+def objekt_for(db: Session, user: m.User, objekt_id) -> m.Objekt:
+    """Lädt ein Objekt nur, wenn der Benutzer es sehen darf. Fremde Objekte verhalten sich wie nicht vorhanden."""
+    objekt = db.get(m.Objekt, int(objekt_id))
+    if objekt is None or not access.allowed(user, objekt.id):
+        raise HTTPException(404, "Nicht gefunden")
+    return objekt
+
+
+def freigeben(user: m.User, objekt: m.Objekt):
+    """Wer nur einzelne Objekte sieht, bekommt ein selbst angelegtes dazu."""
+    if not access.sees_all(user):
+        user.objekt_ids = ",".join(str(i) for i in sorted(access.objekt_ids(user) | {objekt.id}))
 
 
 def csrf_token(request: Request) -> str:
@@ -139,7 +187,8 @@ def flash(request: Request, text: str, kind: str = "ok"):
 
 
 def page(request: Request, name: str, user: m.User | None = None, **ctx):
-    ctx.update(user=user, csrf=csrf_token(request), flash=request.session.pop("flash", None))
+    ctx.update(user=user, csrf=csrf_token(request), flash=request.session.pop("flash", None),
+               perm=access.perms_of(user) if user else {})
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -256,7 +305,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
         flash(request, "Zu viele Fehlversuche. Bitte fünf Minuten warten.", "err")
         return go("/login")
     user = db.scalar(select(m.User).where(func.lower(m.User.username) == username.lower()))
-    if not user or not sec.verify_password(str(form.get("password", "")), user.password_hash):
+    if not user or not user.password_hash or not sec.verify_password(str(form.get("password", "")), user.password_hash):
         _failed[username.lower()] = recent + [time.time()]
         log.warning("Fehlgeschlagene Anmeldung für %r", username)
         flash(request, "Benutzername oder Passwort falsch.", "err")
@@ -264,14 +313,18 @@ async def login(request: Request, db: Session = Depends(get_db)):
     _failed.pop(username.lower(), None)
     request.session.clear()
     request.session["uid"] = user.id
-    user.last_login = m.utcnow()
+    user.last_login = user.last_seen = m.utcnow()
     db.commit()
     return go("/")
 
 
 @app.post("/logout")
-async def logout(request: Request):
+async def logout(request: Request, db: Session = Depends(get_db)):
     await read_form(request)
+    user = db.get(m.User, request.session.get("uid") or 0)
+    if user:
+        user.last_seen = None
+        db.commit()
     request.session.clear()
     return go("/login")
 
@@ -280,7 +333,7 @@ async def logout(request: Request):
 
 @app.get("/")
 def home(request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    objekte = db.scalars(select(m.Objekt).order_by(m.Objekt.name)).all()
+    objekte = [o for o in db.scalars(select(m.Objekt).order_by(m.Objekt.name)).all() if access.allowed(user, o.id)]
     karten = []
     for o in objekte:
         st = laden(o)
@@ -290,36 +343,38 @@ def home(request: Request, user: m.User = Depends(current_user), db: Session = D
 
 
 @app.get("/objekte/neu")
-def objekt_neu(request: Request, user: m.User = Depends(current_user)):
+def objekt_neu(request: Request, user: m.User = Depends(allow("objekte:2"))):
     return page(request, "objekt_form.html", user, o=None)
 
 
 @app.get("/objekte/{oid}/bearbeiten")
-def objekt_bearbeiten(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    return page(request, "objekt_form.html", user, o=need(db.get(m.Objekt, oid)))
+def objekt_bearbeiten(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    return page(request, "objekt_form.html", user, o=objekt_for(db, user, oid))
 
 
 @app.post("/objekte/speichern")
-async def objekt_speichern(request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def objekt_speichern(request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     form = await read_form(request)
     name = text(form, "name", 120)
     oid = text(form, "id", 12)
     if not name:
         flash(request, "Bitte einen Namen eintragen.", "err")
         return go(f"/objekte/{oid}/bearbeiten" if oid else "/objekte/neu")
-    o = need(db.get(m.Objekt, int(oid))) if oid.isdigit() else m.Objekt()
+    o = objekt_for(db, user, oid) if oid.isdigit() else m.Objekt()
     o.name, o.adresse, o.bma_nr = name, text(form, "adresse", 200), text(form, "bma_nr", 40)
     o.hinweis, o.loeschanlage = text(form, "hinweis", 2000), form.get("loeschanlage") == "on"
     db.add(o)
+    db.flush()
+    freigeben(user, o)
     db.commit()
     flash(request, "Objekt gespeichert.")
     return go(f"/objekte/{o.id}/melder" if not oid else f"/objekte/{o.id}")
 
 
 @app.post("/objekte/{oid}/loeschen")
-async def objekt_loeschen(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def objekt_loeschen(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     db.delete(o)
     db.commit()
     flash(request, f"„{o.name}“ gelöscht.")
@@ -327,32 +382,35 @@ async def objekt_loeschen(oid: int, request: Request, user: m.User = Depends(cur
 
 
 @app.post("/objekte/{oid}/kopieren")
-async def objekt_kopieren(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def objekt_kopieren(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     neu = m.Objekt(name=(o.name + " (Kopie)")[:120], adresse=o.adresse, bma_nr=o.bma_nr, hinweis=o.hinweis, loeschanlage=o.loeschanlage)
     for g in o.gruppen:
         neu.gruppen.append(m.Gruppe(nummer=g.nummer, name=g.name, etage=g.etage,
                                     melder=[m.Melder(nummer=x.nummer, typ=x.typ, ort=x.ort) for x in g.melder]))
     db.add(neu)
+    db.flush()
+    freigeben(user, neu)
     db.commit()
     flash(request, "Objekt kopiert.")
     return go(f"/objekte/{neu.id}/bearbeiten")
 
 
 @app.post("/objekte/{oid}/link-erneuern")
-async def link_erneuern(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def link_erneuern(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     o.token = m.new_token()
     db.commit()
+    live.vergessen(o.id)
     flash(request, "Neue Adresse für die Anzeigen vergeben. Die alte gilt nicht mehr.")
     return go(f"/objekte/{oid}")
 
 
 @app.get("/objekte/{oid}/qr.svg")
-def qr(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def qr(oid: int, request: Request, user: m.User = Depends(allow("uebung:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     out = io.BytesIO()
     segno.make(f"{str(request.base_url).rstrip('/')}/a/{o.token}", error="m").save(out, kind="svg", scale=4, border=2)
     return Response(out.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
@@ -361,15 +419,15 @@ def qr(oid: int, request: Request, user: m.User = Depends(current_user), db: Ses
 # ---------- Melderliste ----------
 
 @app.get("/objekte/{oid}/melder")
-def melderliste(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def melderliste(oid: int, request: Request, user: m.User = Depends(allow("objekte:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     return page(request, "melder.html", user, o=o, etagen=katalog.etagen(o), kopf=";".join(katalog.KOPF))
 
 
 @app.post("/objekte/{oid}/melder/hinzufuegen")
-async def melder_hinzufuegen(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def melder_hinzufuegen(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     form = await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     zeile = ";".join(text(form, k, 80).replace(";", ",") for k in ("gruppe", "melder", "typ", "etage", "gname", "ort"))
     zeilen, fehler = katalog.lesen(zeile)
     if fehler:
@@ -382,9 +440,9 @@ async def melder_hinzufuegen(oid: int, request: Request, user: m.User = Depends(
 
 
 @app.post("/objekte/{oid}/melder/import")
-async def melder_import(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def melder_import(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     form = await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     inhalt = str(form.get("liste", ""))
     datei = form.get("datei")
     if datei is not None and getattr(datei, "filename", ""):
@@ -407,18 +465,19 @@ async def melder_import(oid: int, request: Request, user: m.User = Depends(curre
 
 
 @app.get("/objekte/{oid}/melder.csv")
-def melder_export(oid: int, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def melder_export(oid: int, user: m.User = Depends(allow("objekte:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     return Response(katalog.schreiben(o), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="melderliste-{o.id}.csv"'})
 
 
 @app.post("/melder/{mid}/loeschen")
-async def melder_loeschen(mid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def melder_loeschen(mid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
     x = need(db.get(m.Melder, mid))
     g = x.gruppe
     oid = g.objekt_id
+    objekt_for(db, user, oid)
     g.melder.remove(x)
     if not g.melder:
         db.delete(g)
@@ -427,10 +486,11 @@ async def melder_loeschen(mid: int, request: Request, user: m.User = Depends(cur
 
 
 @app.post("/gruppen/{gid}/loeschen")
-async def gruppe_loeschen(gid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def gruppe_loeschen(gid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
     g = need(db.get(m.Gruppe, gid))
     oid = g.objekt_id
+    objekt_for(db, user, oid)
     db.delete(g)
     db.commit()
     flash(request, f"Gruppe {sim.nr(g.nummer)} gelöscht.")
@@ -440,30 +500,34 @@ async def gruppe_loeschen(gid: int, request: Request, user: m.User = Depends(cur
 # ---------- Ausbilderansicht ----------
 
 @app.get("/objekte/{oid}")
-def leitstand(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def leitstand(oid: int, request: Request, user: m.User = Depends(allow("uebung:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     link = f"{str(request.base_url).rstrip('/')}/a/{o.token}"
     return page(request, "leitstand.html", user, o=o, etagen=katalog.etagen(o), link=link)
 
 
-def ausbilder_antwort(db: Session, o: m.Objekt, st: dict) -> dict:
-    return {"st": st, "sicht": sim.sicht(st), "protokoll": protokoll_zeilen(db, o.id)}
+def ausbilder_antwort(db: Session, o: m.Objekt, st: dict, user: m.User) -> dict:
+    geraete = live.liste(o.id)
+    antwort = {"st": st, "sicht": sim.sicht(st), "live": geraete, "pv": live.signatur(geraete)}
+    if access.perms_of(user)["protokoll"]:
+        antwort["protokoll"] = protokoll_zeilen(db, o.id)
+    return antwort
 
 
 @app.get("/objekte/{oid}/state")
-def leitstand_state(oid: int, v: int = 0, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def leitstand_state(oid: int, v: int = 0, pv: str = "", user: m.User = Depends(allow("uebung:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     st = zustand(db, o)
-    if v == st["v"]:
+    if v == st["v"] and pv == live.signatur(live.liste(o.id)):
         return Response(status_code=204)
-    return ausbilder_antwort(db, o, st)
+    return ausbilder_antwort(db, o, st, user)
 
 
 @app.post("/objekte/{oid}/aktion")
-async def leitstand_aktion(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def leitstand_aktion(oid: int, request: Request, user: m.User = Depends(allow("uebung:2")), db: Session = Depends(get_db)):
     check_csrf(request, request.headers.get("x-csrf", ""))
     data = await read_json(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     aktion = str(data.get("aktion", ""))
     wer = f"Ausbilder {user.username}"
 
@@ -538,12 +602,12 @@ async def leitstand_aktion(oid: int, request: Request, user: m.User = Depends(cu
         raise HTTPException(400, "Unbekannte Aktion")
     st = aendern(db, o, fn)
     protokoll_kuerzen(db, o.id)
-    return ausbilder_antwort(db, o, st)
+    return ausbilder_antwort(db, o, st, user)
 
 
 @app.get("/objekte/{oid}/protokoll.csv")
-def protokoll_export(oid: int, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
-    o = need(db.get(m.Objekt, oid))
+def protokoll_export(oid: int, user: m.User = Depends(allow("protokoll:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
     rows = db.scalars(select(m.Protokoll).where(m.Protokoll.objekt_id == o.id).order_by(m.Protokoll.id)).all()
     aus = io.StringIO()
     w = csv.writer(aus, delimiter=";", lineterminator="\r\n")
@@ -555,9 +619,9 @@ def protokoll_export(oid: int, user: m.User = Depends(current_user), db: Session
 
 
 @app.post("/objekte/{oid}/protokoll/leeren")
-async def protokoll_leeren(oid: int, request: Request, user: m.User = Depends(current_user), db: Session = Depends(get_db)):
+async def protokoll_leeren(oid: int, request: Request, user: m.User = Depends(allow("protokoll:2")), db: Session = Depends(get_db)):
     await read_form(request)
-    o = need(db.get(m.Objekt, oid))
+    o = objekt_for(db, user, oid)
     db.execute(delete(m.Protokoll).where(m.Protokoll.objekt_id == o.id))
     db.commit()
     aendern(db, o, lambda st, eintraege, now: eintraege.append((f"Ausbilder {user.username}", "Protokoll geleert")))
@@ -599,11 +663,20 @@ def anzeige_verzeichnis(token: str, request: Request, db: Session = Depends(get_
 
 
 @app.get("/a/{token}/state")
-def anzeige_state(token: str, v: int = 0, db: Session = Depends(get_db)):
-    st = zustand(db, objekt_zu(db, token))
+def anzeige_state(token: str, request: Request, v: int = 0, db: Session = Depends(get_db)):
+    o = objekt_zu(db, token)
+    live.melden(o.id, request.query_params)
+    st = zustand(db, o)
     if v == st["v"]:
         return Response(status_code=204)
     return JSONResponse(oeffentlich(st), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/a/{token}/da")
+def anzeige_da(token: str, request: Request, db: Session = Depends(get_db)):
+    """Lebenszeichen der Seiten ohne eigene Anzeige (Auswahl, Verzeichnis) für das Live-Bild."""
+    live.melden(objekt_zu(db, token).id, request.query_params)
+    return Response(status_code=204)
 
 
 GERAETE = {"fbf": ("akustik_ab", "bfs_ab", "ue_ab", "ue_pruefen", "ruecksetzen"), "fat": ("summer_ab",),
@@ -631,44 +704,109 @@ async def anzeige_aktion(token: str, request: Request, db: Session = Depends(get
     return JSONResponse(oeffentlich(aendern(db, o, fn)), headers={"Cache-Control": "no-store"})
 
 
-# ---------- Benutzer ----------
+# ---------- Benutzer und Rechte ----------
+
+def einladung_starten(target: m.User) -> str:
+    """Erzeugt einen Einmal-Link; gespeichert wird nur sein Hash. Ein früherer Link wird damit ungültig."""
+    token = secrets.token_urlsafe(32)
+    target.invite_hash = hashlib.sha256(token.encode()).hexdigest()
+    target.invite_expires = m.utcnow() + dt.timedelta(hours=INVITE_HOURS)
+    return token
+
+
+def eingeladen(db: Session, token: str) -> m.User | None:
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    found = db.scalar(select(m.User).where(m.User.invite_hash == digest))
+    if not found or not found.invite_expires or found.invite_expires < m.utcnow():
+        return None
+    return found
+
 
 @app.get("/benutzer")
-def benutzer(request: Request, user: m.User = Depends(admin_user), db: Session = Depends(get_db)):
-    return page(request, "benutzer.html", user, liste=db.scalars(select(m.User).order_by(m.User.username)).all())
+def benutzer(request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
+    namen = {o.id: o.name for o in db.scalars(select(m.Objekt)).all()}
+    now = m.utcnow()
+    rows = [{"user": u, "role": access.role_of(u), "all": access.sees_all(u),
+             "objekte": [namen[i] for i in sorted(access.objekt_ids(u)) if i in namen],
+             "pending": bool(u.invite_hash and u.invite_expires and u.invite_expires > now),
+             "online": bool(u.last_seen and (now - u.last_seen).total_seconds() < 180)}
+            for u in db.scalars(select(m.User).order_by(m.User.username)).all()]
+    return page(request, "benutzer.html", user, rows=rows)
+
+
+def benutzer_formular(request: Request, user: m.User, db: Session, target: m.User | None):
+    link = None
+    merk = request.session.pop("einladung", None)
+    if target and merk and merk[0] == target.id:
+        link = f"{str(request.base_url).rstrip('/')}/einladung/{merk[1]}"
+    return page(request, "benutzer_form.html", user, target=target, areas=access.AREAS, presets=access.PRESETS,
+                role_names=access.ROLE_NAMES, role_hints=access.ROLE_HINTS,
+                tperms=access.perms_of(target) if target else dict(access.PRESETS["ausbilder"]),
+                t_all=access.sees_all(target) if target else True, t_ids=access.objekt_ids(target) if target else set(),
+                objekte=db.scalars(select(m.Objekt).order_by(m.Objekt.name)).all(), link=link, hours=INVITE_HOURS,
+                pending=bool(target and target.invite_hash and target.invite_expires and target.invite_expires > m.utcnow()))
+
+
+@app.get("/benutzer/neu")
+def benutzer_neu(request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
+    return benutzer_formular(request, user, db, None)
+
+
+@app.get("/benutzer/{uid}/bearbeiten")
+def benutzer_bearbeiten(uid: int, request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
+    return benutzer_formular(request, user, db, need(db.get(m.User, uid)))
 
 
 @app.post("/benutzer/speichern")
-async def benutzer_speichern(request: Request, user: m.User = Depends(admin_user), db: Session = Depends(get_db)):
+async def benutzer_speichern(request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
     form = await read_form(request)
-    name, password = text(form, "username", 80), str(form.get("password", ""))
-    if not name or len(password) < 12:
-        flash(request, "Bitte Benutzername und ein Passwort mit mindestens 12 Zeichen angeben.", "err")
-    elif db.scalar(select(m.User).where(func.lower(m.User.username) == name.lower())):
-        flash(request, "Diesen Benutzernamen gibt es schon.", "err")
-    else:
-        db.add(m.User(username=name, password_hash=sec.hash_password(password), is_admin=form.get("is_admin") == "on"))
-        db.commit()
-        flash(request, f"Benutzer „{name}“ angelegt.")
-    return go("/benutzer")
-
-
-@app.post("/benutzer/{uid}/passwort")
-async def benutzer_passwort(uid: int, request: Request, user: m.User = Depends(admin_user), db: Session = Depends(get_db)):
-    form = await read_form(request)
-    ziel = need(db.get(m.User, uid))
-    password = str(form.get("password", ""))
-    if len(password) < 12:
+    uid, password = text(form, "id", 12), str(form.get("password", ""))
+    perms, everything, ids = access.from_form(form)
+    if password and len(password) < 12:
         flash(request, "Das Passwort braucht mindestens 12 Zeichen.", "err")
+        return go(f"/benutzer/{uid}/bearbeiten" if uid else "/benutzer/neu")
+    if uid:
+        target = need(db.get(m.User, int(uid)))
+        if target.id == user.id and perms["users"] != 2:
+            flash(request, "Das Recht, Benutzer zu verwalten, kannst du dir nicht selbst nehmen.", "err")
+            return go(f"/benutzer/{uid}/bearbeiten")
     else:
-        ziel.password_hash = sec.hash_password(password)
-        db.commit()
-        flash(request, f"Passwort für „{ziel.username}“ gesetzt.")
+        name = text(form, "username", 80)
+        if not name:
+            flash(request, "Bitte einen Benutzernamen eintragen.", "err")
+            return go("/benutzer/neu")
+        if db.scalar(select(m.User).where(func.lower(m.User.username) == name.lower())):
+            flash(request, "Diesen Benutzernamen gibt es schon.", "err")
+            return go("/benutzer/neu")
+        target = m.User(username=name, password_hash="")
+        db.add(target)
+    target.perms, target.all_objekte, target.objekt_ids = json.dumps(perms), everything, ids
+    target.is_admin = perms["users"] == 2
+    if password:
+        target.password_hash = sec.hash_password(password)
+        target.invite_hash, target.invite_expires = "", None
+    token = None if target.password_hash else einladung_starten(target)
+    db.commit()
+    if token:  # ohne Passwort angelegt: Der Einmal-Link wird genau einmal auf der Folgeseite gezeigt
+        request.session["einladung"] = [target.id, token]
+        flash(request, f"Benutzer „{target.username}“ angelegt. Gib ihm den Link unten weiter.")
+        return go(f"/benutzer/{target.id}/bearbeiten")
+    flash(request, f"Benutzer „{target.username}“ gespeichert.")
     return go("/benutzer")
+
+
+@app.post("/benutzer/{uid}/einladung")
+async def benutzer_einladung(uid: int, request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
+    await read_form(request)
+    target = need(db.get(m.User, uid))
+    request.session["einladung"] = [target.id, einladung_starten(target)]
+    db.commit()
+    flash(request, "Neuer Link erzeugt. Ein früherer Link gilt nicht mehr.")
+    return go(f"/benutzer/{uid}/bearbeiten")
 
 
 @app.post("/benutzer/{uid}/loeschen")
-async def benutzer_loeschen(uid: int, request: Request, user: m.User = Depends(admin_user), db: Session = Depends(get_db)):
+async def benutzer_loeschen(uid: int, request: Request, user: m.User = Depends(allow("users:2")), db: Session = Depends(get_db)):
     await read_form(request)
     ziel = need(db.get(m.User, uid))
     if ziel.id == user.id:
@@ -680,9 +818,72 @@ async def benutzer_loeschen(uid: int, request: Request, user: m.User = Depends(a
     return go("/benutzer")
 
 
+@app.get("/einladung/{token}")
+def einladung_form(token: str, request: Request, db: Session = Depends(get_db)):
+    return page(request, "einladung.html", None, target=eingeladen(db, token), token=token, hours=INVITE_HOURS)
+
+
+@app.post("/einladung/{token}")
+async def einladung_speichern(token: str, request: Request, db: Session = Depends(get_db)):
+    form = await read_form(request)
+    target = eingeladen(db, token)
+    if target is None:
+        return page(request, "einladung.html", None, target=None, token=token, hours=INVITE_HOURS)
+    password = str(form.get("password", ""))
+    if len(password) < 12 or password != str(form.get("repeat", "")):
+        flash(request, "Das Passwort braucht mindestens 12 Zeichen, und beide Eingaben müssen gleich sein.", "err")
+        return go(f"/einladung/{token}")
+    target.password_hash = sec.hash_password(password)
+    target.invite_hash, target.invite_expires = "", None  # Link ist damit verbraucht
+    db.commit()
+    log.info("%r hat über den Einladungslink ein Passwort festgelegt.", target.username)
+    flash(request, "Passwort gespeichert. Du kannst dich jetzt anmelden.")
+    return go("/login")
+
+
+# ---------- Sicherung ----------
+
+@app.get("/sicherung")
+def sicherung(request: Request, user: m.User = Depends(allow("users:2"))):
+    return page(request, "sicherung.html", user, items=backup.listing(), keep=backup.KEEP, hours=backup.AUTO_HOURS, folder=backup.DIR)
+
+
+@app.post("/sicherung/herunterladen")
+async def sicherung_herunterladen(request: Request, user: m.User = Depends(allow("users:2"))):
+    await read_form(request)
+    name, data = await asyncio.to_thread(backup.build)
+    log.info("Sicherung heruntergeladen von %r.", user.username)
+    return Response(data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.post("/sicherung/ablegen")
+async def sicherung_ablegen(request: Request, user: m.User = Depends(allow("users:2"))):
+    await read_form(request)
+    try:
+        name = await asyncio.to_thread(backup.store)
+    except OSError as exc:
+        flash(request, f"Die Sicherung konnte nicht abgelegt werden: {exc}", "err")
+        return go("/sicherung")
+    flash(request, f"Sicherung {name} abgelegt.")
+    return go("/sicherung")
+
+
+@app.get("/sicherung/datei/{name}")
+def sicherung_datei(name: str, user: m.User = Depends(allow("users:2"))):
+    return FileResponse(need(backup.path_of(name)), media_type="application/zip", filename=name)
+
+
+@app.post("/sicherung/datei/{name}/loeschen")
+async def sicherung_loeschen(name: str, request: Request, user: m.User = Depends(allow("users:2"))):
+    await read_form(request)
+    os.remove(need(backup.path_of(name)))
+    flash(request, f"Sicherung {name} gelöscht.")
+    return go("/sicherung")
+
+
 @app.get("/konto")
 def konto(request: Request, user: m.User = Depends(current_user)):
-    return page(request, "konto.html", user)
+    return page(request, "konto.html", user, role=access.role_of(user))
 
 
 @app.post("/konto")

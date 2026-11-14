@@ -2,6 +2,7 @@
 {% block content %}
 <h1>Mein Konto</h1>
 <div class="card narrow">
+  <p>Angemeldet als <strong>{{ user.username }}</strong>, Rolle: {{ role }}.</p>
   <h2>Passwort ändern</h2>
   <form method="post" action="/konto">
     <input type="hidden" name="csrf" value="{{ csrf }}">

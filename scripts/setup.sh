@@ -58,6 +58,8 @@ COOKIE_SECURE=${COOKIE_SECURE:-false}
 TZ=${TZ:-Europe/Berlin}
 BEISPIELE=${BEISPIELE:-true}
 LOG_KEEP=2000
+BACKUP_HOURS=24
+BACKUP_KEEP=14
 EOF
       printf 'BMA Simulator, erster Zugang\nBenutzer: admin\nPasswort: %s\nBitte nach der ersten Anmeldung unter "Mein Konto" ändern und diese Datei löschen.\n' "$ADMIN_PASSWORD" > "$CRED_FILE"
     )

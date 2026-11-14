@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row"><h1>Melderliste: {{ o.name }}</h1>
-  <div><a class="btn" href="/objekte/{{ o.id }}">Übung öffnen</a> <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a></div></div>
+  <div>{% if perm.uebung %}<a class="btn" href="/objekte/{{ o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a>{% endif %}
+    {% if perm.objekte == 2 %}<a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div></div>
 
+{% set darf = perm.objekte == 2 %}
+{% if darf %}
 <div class="card">
   <h2>Melder hinzufügen oder ändern</h2>
   <form method="post" action="/objekte/{{ o.id }}/melder/hinzufuegen">
@@ -21,6 +24,7 @@
     <div class="actions"><button>Speichern</button></div>
   </form>
 </div>
+{% endif %}
 
 <div class="card">
   <div class="row"><h2>{{ o.gruppen|length }} Gruppen</h2><a class="btn light" href="/objekte/{{ o.id }}/melder.csv">Als CSV herunterladen</a></div>
@@ -31,16 +35,17 @@
     <tr><th>Nummer</th><th>Typ</th><th>Ort</th><th></th></tr>
     {% for g in o.gruppen if g.etage == e %}
     <tr class="gruppe"><td><strong>{{ nr(g.nummer) }}</strong></td><td colspan="2"><strong>{{ g.name or "Gruppe ohne Namen" }}</strong></td>
-      <td class="r"><form class="inline" method="post" action="/gruppen/{{ g.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Gruppe {{ nr(g.nummer) }} mit {{ g.melder|length }} Meldern löschen?">Gruppe löschen</button></form></td></tr>
+      <td class="r">{% if darf %}<form class="inline" method="post" action="/gruppen/{{ g.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Gruppe {{ nr(g.nummer) }} mit {{ g.melder|length }} Meldern löschen?">Gruppe löschen</button></form>{% endif %}</td></tr>
     {% for x in g.melder %}
     <tr><td>{{ nr(g.nummer, x.nummer) }}</td><td>{{ typen.get(x.typ, x.typ) }}</td><td>{{ x.ort }}</td>
-      <td class="r"><form class="inline" method="post" action="/melder/{{ x.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Löschen</button></form></td></tr>
+      <td class="r">{% if darf %}<form class="inline" method="post" action="/melder/{{ x.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Löschen</button></form>{% endif %}</td></tr>
     {% endfor %}
     {% endfor %}
   </table>
   {% endfor %}
 </div>
 
+{% if darf %}
 <div class="card">
   <h2>Liste einlesen</h2>
   <p class="hint">Je Zeile ein Melder, Spalten getrennt durch Semikolon, Komma oder Tabulator (aus Excel kopieren geht):<br>
@@ -55,5 +60,6 @@
     <div class="actions"><button>Einlesen</button></div>
   </form>
 </div>
+{% endif %}
 <script src="/static/frage.js?v=1"></script>
 {% endblock %}

@@ -1,29 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Benutzer</h1>
+<div class="row"><h1>Benutzer und Rechte</h1><a class="btn" href="/benutzer/neu">Benutzer anlegen</a></div>
 <div class="card">
 <table>
-  <tr><th>Benutzername</th><th>Rolle</th><th>Letzte Anmeldung</th><th>Neues Passwort setzen</th><th></th></tr>
-  {% for u in liste %}
-  <tr><td>{{ u.username }}</td><td>{{ "Administrator" if u.is_admin else "Ausbilder" }}</td><td>{{ u.last_login|localtime }}</td>
-    <td><form class="inline pw" method="post" action="/benutzer/{{ u.id }}/passwort"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="password" name="password" minlength="12" required aria-label="Neues Passwort für {{ u.username }}" autocomplete="new-password"> <button class="light">Setzen</button></form></td>
-    <td class="r">{% if u.id != user.id %}<form class="inline" method="post" action="/benutzer/{{ u.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Benutzer {{ u.username }} löschen?">Löschen</button></form>{% endif %}</td></tr>
-  {% endfor %}
+<tr><th>Benutzername</th><th>Rolle</th><th>Objekte</th><th>Letzte Anmeldung</th><th></th></tr>
+{% for r in rows %}
+<tr>
+  <td><span class="dot{{ ' on' if r.online }}" title="{{ 'angemeldet und aktiv' if r.online else 'nicht aktiv' }}"></span><a href="/benutzer/{{ r.user.id }}/bearbeiten"><strong>{{ r.user.username }}</strong></a>{% if r.user.id == user.id %} <span class="tag">du</span>{% endif %}
+    {% if r.pending %} <span class="tag test">Einladung offen</span>{% elif not r.user.password_hash %} <span class="tag fehler">ohne Passwort</span>{% endif %}</td>
+  <td>{{ r.role }}</td>
+  <td>{% if r.all %}alle{% elif r.objekte %}{{ r.objekte|join(', ') }}{% else %}<span class="tag fehler">keine freigegeben</span>{% endif %}</td>
+  <td>{{ r.user.last_login|localtime }}</td>
+  <td class="r"><a class="btn light klein" href="/benutzer/{{ r.user.id }}/bearbeiten">Bearbeiten</a>
+    {% if r.user.id != user.id %}<form class="inline" method="post" action="/benutzer/{{ r.user.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Benutzer {{ r.user.username }} löschen?">Löschen</button></form>{% endif %}</td>
+</tr>
+{% endfor %}
 </table>
-</div>
-<div class="card">
-  <h2>Neuer Benutzer</h2>
-  <form method="post" action="/benutzer/speichern">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="grid">
-      <div><label for="username">Benutzername</label><input type="text" id="username" name="username" maxlength="80" required autocomplete="off"></div>
-      <div><label for="password">Passwort (mindestens 12 Zeichen)</label><input type="password" id="password" name="password" minlength="12" required autocomplete="new-password"></div>
-    </div>
-    <label class="check"><input type="checkbox" name="is_admin"> Administrator (darf Benutzer verwalten)</label>
-    <p class="hint">Ausbilder dürfen Objekte anlegen, ändern und Übungen steuern.</p>
-    <div class="actions"><button>Anlegen</button></div>
-  </form>
+<p class="hint">Der grüne Punkt zeigt, wer in den letzten drei Minuten angemeldet aktiv war. Jeder Benutzer kann sein eigenes Passwort unter „Mein Konto“ ändern.</p>
 </div>
 <script src="/static/frage.js?v=1"></script>
 {% endblock %}

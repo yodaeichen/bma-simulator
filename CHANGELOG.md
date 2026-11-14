@@ -2,6 +2,22 @@
 
 Die Versionsnummer steht in `app/version.py` und wird unten auf jeder Seite des Simulators angezeigt.
 
+## 1.1.0
+
+- **Live-Bild der Übenden** in der Ausbilderansicht: je geöffneter Anzeige eine kleine Kachel mit dem Text, den FAT oder BMZ
+  gerade zeigt, der Anzeigeebene, dem Schloss (FBF aufgeschlossen, Bedienung frei), „Ton an/aus" und der zuletzt gedrückten Taste;
+  auch Geräte, die das Meldergruppenverzeichnis lesen, erscheinen dort
+- **Benutzer und Rechte** wie im DIVERA Gateway: Einzelrechte je Bereich (Objekte, Übungen, Protokoll, Benutzer), die Rollen
+  Administrator, Ausbilder und Beobachter als Vorlage, Beschränkung auf einzelne Objekte
+- Benutzer ohne Passwort anlegen: Der Simulator erzeugt einen Einmal-Link (48 Stunden gültig), über den der Benutzer sein
+  Passwort selbst festlegt; derselbe Weg hilft bei vergessenem Passwort
+- Die Benutzerliste zeigt, wer gerade angemeldet aktiv ist
+- Neue Seite **Sicherung** (nur mit dem Recht „Benutzer, Rechte und Sicherung"): die ganze Datenbank als ZIP herunterladen oder
+  per Knopf auf dem Server ablegen
+- Automatische Sicherung alle 24 Stunden nach `/var/lib/bma-simulator/backups`, die neuesten 14 bleiben erhalten
+  (einstellbar über `BACKUP_HOURS` und `BACKUP_KEEP`); jede Sicherung enthält eine LIESMICH.txt mit den Schritten zur Wiederherstellung
+- Bestehende Konten behalten ihre Rolle: Administratoren bleiben Administratoren, alle anderen werden Ausbilder mit Zugriff auf alle Objekte
+
 ## 1.0.0
 
 Neuaufbau als Serveranwendung. Die frühere Fassung war eine einzelne HTML-Datei, in der Ausbilderansicht und Anzeigen

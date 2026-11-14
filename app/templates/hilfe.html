@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Hilfe</h1>
-<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
+<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#live">Live-Bild</a> &middot; <a href="#rechte">Benutzer und Sicherung</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
 
 <div class="card" id="ablauf">
   <h2>Ablauf einer Übung</h2>
@@ -36,6 +36,28 @@
     <li>Die Etage gehört zur Gruppe. In der Ausbilderansicht lässt sich nach Etagen filtern.</li>
     <li>Eine vorhandene Liste lässt sich als CSV herunterladen, in Excel ändern und wieder einlesen. „Objekt kopieren“ legt ein zweites Objekt mit derselben Liste an.</li>
   </ol>
+</div>
+
+<div class="card" id="live">
+  <h2>Live-Bild der Übenden</h2>
+  <p>Die Ausbilderansicht zeigt für jedes Gerät, das eine Anzeige geöffnet hat, eine kleine Kachel:</p>
+  <ol class="steps">
+    <li>den Text, den FAT oder BMZ dort gerade zeigt, samt Anzeigeebene,</li>
+    <li>ob das FBF aufgeschlossen bzw. die Bedienung der BMZ freigegeben ist,</li>
+    <li>ob der Ton eingeschaltet ist (sonst hören die Übenden den Summer nicht),</li>
+    <li>die zuletzt gedrückte Taste mit Uhrzeit, auch wenn sie am verschlossenen FBF ohne Wirkung blieb.</li>
+  </ol>
+  <p class="hint">Ein Gerät, das sich sechs Sekunden nicht meldet, verschwindet aus dem Live-Bild. Gespeichert wird davon nichts.</p>
+</div>
+
+<div class="card" id="rechte">
+  <h2>Benutzer und Sicherung</h2>
+  <p>Unter „Benutzer“ bekommt jeder Benutzer eine Rolle (Administrator, Ausbilder, Beobachter) oder einzeln eingestellte Rechte
+    und entweder alle Objekte oder nur ausgewählte. Bleibt beim Anlegen das Passwort leer, zeigt der Simulator einmalig einen
+    Link, über den der Benutzer sein Passwort selbst festlegt.</p>
+  <p>Unter „Sicherung“ lässt sich die ganze Datenbank herunterladen oder auf dem Server ablegen. Einmal am Tag legt der Simulator
+    von selbst eine Sicherung ab. Wie man eine Sicherung zurückspielt, steht in der LIESMICH.txt jeder Sicherung.</p>
+  <p class="hint">Beide Menüpunkte sieht nur, wer das Recht „Benutzer, Rechte und Sicherung“ hat.</p>
 </div>
 
 <div class="card faq" id="fragen">

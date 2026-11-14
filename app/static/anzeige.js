@@ -6,6 +6,14 @@
   var token = root.dataset.token, v = 0, st = null, sicht = null;
   var istFat = !!document.getElementById("fat-lcd"), geraet = istFat ? "fat" : "bmz";
   var ebene = "alarm", pos = 0, folgen = true, alarmeVorher = 0;
+  // Für das Live-Bild des Ausbilders: Kennung dieses Geräts, Text der Anzeige, zuletzt gedrückte Taste
+  var cid = "", lcdText = "", lcdGesendet = null, runde = 0, tasteNr = 0, tasteName = "", aufgeschlossen = false;
+  try { cid = window.sessionStorage.getItem("bma-geraet") || ""; } catch (e) { /* ohne Speicher: neue Kennung je Seite */ }
+  if (!/^[a-z0-9]{8}$/.test(cid)) {
+    cid = Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+    try { window.sessionStorage.setItem("bma-geraet", cid); } catch (e) { /* egal */ }
+  }
+  function taste(name) { tasteNr += 1; tasteName = String(name).replace(/\s+/g, " ").trim().slice(0, 60); }
   var TYPEN = { rm: "Rauchmelder", wm: "Wärmemelder", mm: "Mehrkriterienmelder", fm: "Flammenmelder", gm: "Gasmelder",
     lm: "Linearer Rauchmelder", ras: "Rauchansaugsystem", hfm: "Handfeuermelder", spr: "Sprinklergruppe" };
   var WORT = { alarm: "FEUER", stoerung: "STOERUNG", abschaltung: "ABSCH." };
@@ -54,6 +62,7 @@
     if (audio && audio.state === "suspended") audio.resume();
     tonKnopf.setAttribute("aria-pressed", tonAn ? "true" : "false");
     tonKnopf.textContent = tonAn ? "Ton aus" : "Ton ein";
+    taste(tonAn ? "Ton eingeschaltet" : "Ton ausgeschaltet");
     if (tonAn) piep();
   });
 
@@ -79,7 +88,8 @@
       z[0] = fatKopf(l[pos], pos); z[1] = fatText(l[pos]);
       if (l[pos + 1]) { z[2] = fatKopf(l[pos + 1], pos + 1); z[3] = fatText(l[pos + 1]); }
     }
-    $("#fat-lcd").textContent = z.map(function (s) { return pad(s, 20); }).join("\n");
+    lcdText = z.map(function (s) { return pad(s, 20); }).join("\n");
+    $("#fat-lcd").textContent = lcdText;
     $("#fat-ebene-name").textContent = "Ebene: " + NAME[ebene];
     return l.length > 2;
   }
@@ -105,7 +115,9 @@
       });
     }
     while (z.length < 11) z.push("");
-    $("#bmz-lcd").textContent = z.slice(0, 11).map(function (s) { return pad(s, B); }).join("\n");
+    z = z.slice(0, 11).map(function (s) { return pad(s, B); });
+    $("#bmz-lcd").textContent = z.join("\n");
+    lcdText = [z[0]].concat(z.slice(3)).join("\n");  // ohne die Zeile mit der Uhrzeit, sonst ändert sich der Text jede Sekunde
     all("[data-ebene]").forEach(function (b) { b.classList.toggle("on", b.dataset.ebene === ebene); b.setAttribute("aria-pressed", b.dataset.ebene === ebene); });
     return false;
   }
@@ -131,9 +143,12 @@
   }
   function offline(an) { $("#offline").hidden = !an; }
   function holen() {
-    fetch("/a/" + token + "/state?v=" + v, { cache: "no-store" })
+    var mitText = lcdText !== lcdGesendet || (runde += 1) % 5 === 0, text = lcdText;
+    var q = "/a/" + token + "/state?v=" + v + "&c=" + cid + "&g=" + geraet + "&e=" + ebene + "&o=" + (aufgeschlossen ? 1 : 0) +
+      "&t=" + (tonAn ? 1 : 0) + "&kn=" + tasteNr + "&k=" + encodeURIComponent(tasteName) + (mitText ? "&l=" + encodeURIComponent(text) : "");
+    fetch(q, { cache: "no-store" })
       .then(function (r) { if (r.status === 204) return null; if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(function (d) { offline(false); if (d) uebernehmen(d); })
+      .then(function (d) { offline(false); if (mitText) lcdGesendet = text; if (d) uebernehmen(d); })
       .catch(function () { offline(true); })
       .then(function () { window.setTimeout(holen, 1000); });
   }
@@ -150,6 +165,8 @@
     if (!knopf) return;
     knopf.addEventListener("click", function () {
       var auf = kasten.classList.toggle("zu") === false;
+      aufgeschlossen = auf;
+      taste(auf ? "Aufgeschlossen" : "Verschlossen");
       knopf.setAttribute("aria-pressed", auf ? "true" : "false");
       knopf.querySelector("span").textContent = auf ? aufText : zuText;
     });
@@ -162,22 +179,25 @@
     if (t) {
       var fbf = t.closest(".fbf"), bmz = t.closest(".bmz");
       var gesperrt = (fbf && fbf.classList.contains("zu")) || (bmz && bmz.classList.contains("zu") && t.classList.contains("gesperrt"));
+      var name = t.getAttribute("aria-label") || t.textContent;
       if (gesperrt) {  // erst aufschließen: das Schloss kurz hervorheben
         var s = (fbf || bmz).querySelector(".schloss");
         s.focus();
+        taste(name + " (verschlossen)");
         return;
       }
+      taste(name);
       senden(t.dataset.geraet, t.dataset.aktion);
       return;
     }
     var e = ev.target.closest("[data-ebene]");
-    if (e) { ebene = e.dataset.ebene; pos = 0; zeichnen(); return; }
+    if (e) { ebene = e.dataset.ebene; pos = 0; taste("Anzeige: " + e.textContent); zeichnen(); return; }
     if (ev.target.closest("#fat-ebene")) {
       ebene = ebene === "alarm" ? "stoerung" : ebene === "stoerung" ? "abschaltung" : "alarm";
-      pos = 0; folgen = true; zeichnen(); return;
+      pos = 0; folgen = true; taste("Anzeigeebene"); zeichnen(); return;
     }
-    if (ev.target.closest("#fat-auf, #bmz-auf")) { folgen = false; pos -= 1; zeichnen(); return; }
-    if (ev.target.closest("#fat-ab, #bmz-ab")) { folgen = false; pos += 1; zeichnen(); }
+    if (ev.target.closest("#fat-auf, #bmz-auf")) { folgen = false; pos -= 1; taste("Pfeil nach oben"); zeichnen(); return; }
+    if (ev.target.closest("#fat-ab, #bmz-ab")) { folgen = false; pos += 1; taste("Pfeil nach unten"); zeichnen(); }
   });
 
   window.setInterval(zeichnen, 1000);  // Uhrzeit in der Anzeige

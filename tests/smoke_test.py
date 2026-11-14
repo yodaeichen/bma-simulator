@@ -17,7 +17,7 @@ sys.path.insert(0, ROOT)
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import db as m  # noqa: E402
-from app import katalog, sim  # noqa: E402
+from app import access, backup, katalog, live, sim  # noqa: E402
 from app.main import app  # noqa: E402
 from app.version import VERSION  # noqa: E402
 
@@ -153,7 +153,8 @@ with TestClient(app, base_url="http://testserver") as c:
     assert d["sicht"]["alarme"] == 1 and d["st"]["ue"] and d["st"]["meldungen"][0]["ort"] == "Tor <script>"
     assert "Ausbilder admin" in d["protokoll"][-1]["quelle"] or any("Ausbilder admin" == z["quelle"] for z in d["protokoll"])
     v = d["st"]["v"]
-    assert c.get(f"/objekte/{oid}/state?v={v}").status_code == 204
+    assert d["live"] == [] and c.get(f"/objekte/{oid}/state?v={v}&pv={d['pv']}").status_code == 204
+    assert c.get(f"/objekte/{oid}/state?v={v}").status_code == 200, "ohne Fingerabdruck des Live-Bilds kommt der volle Stand"
     assert c.get(f"/objekte/{oid}/state?v=0").json()["st"]["v"] == v
 
     # Anzeigen der Übenden: ohne Anmeldung, aber nur mit der geheimen Adresse
@@ -169,6 +170,25 @@ with TestClient(app, base_url="http://testserver") as c:
         assert gast.post(f"/a/{token}/aktion", json={"geraet": "fbf", "aktion": "grundstellung"}).status_code == 400
         assert gast.post(f"/a/{token}/aktion", content=b"x" * 5000).status_code == 413
         assert gast.post(f"/objekte/{oid}/aktion", json={"aktion": "grundstellung"}).status_code == 401
+        # Live-Bild: Die Anzeige meldet, was sie zeigt und was gedrückt wurde
+        lcd = "0005/01 FEUER    001\nTor <script>"
+        assert gast.get(f"/a/{token}/state", params={"v": d["st"]["v"], "c": "ab12cd34", "g": "fat", "e": "stoerung", "o": "1", "t": "0",
+                                                     "kn": "0", "k": "", "l": lcd}).status_code == 204
+        gast.get(f"/a/{token}/state", params={"v": d["st"]["v"], "c": "ab12cd34", "g": "fat", "e": "stoerung", "o": "1", "t": "0",
+                                              "kn": "1", "k": "Anzeigeebene" + "x" * 100})
+        assert gast.get(f"/a/{token}/da", params={"c": "zz99zz99", "g": "verz"}).status_code == 204
+        gast.get(f"/a/{token}/da", params={"c": "<script>", "g": "verz"})
+        gast.get(f"/a/{token}/da", params={"c": "qq11qq11", "g": "unsinn"})
+        bild = c.get(f"/objekte/{oid}/state?v=0").json()
+        assert [g["name"] for g in bild["live"]] == ["FAT und FBF", "Meldergruppenverzeichnis"], "ungültige Meldungen zählen nicht"
+        fat = bild["live"][0]
+        assert fat["id"] == "AB12" and fat["lcd"] == lcd.split("\n") and fat["ebene"] == "stoerung" and fat["offen"] and not fat["ton"]
+        assert fat["taste"].startswith("Anzeigeebene") and len(fat["taste"]) == 60 and fat["taste_zeit"], "Text der Taste gekürzt"
+        assert c.get(f"/objekte/{oid}/state?v={bild['st']['v']}&pv={bild['pv']}").status_code == 204
+        with live._lock:  # sechs Sekunden ohne Lebenszeichen: Gerät gilt als getrennt
+            for e in live._geraete[oid].values():
+                e["gesehen"] -= 10
+        assert c.get(f"/objekte/{oid}/state?v={bild['st']['v']}&pv={bild['pv']}").json()["live"] == []
         d = gast.post(f"/a/{token}/aktion", json={"geraet": "fat", "aktion": "summer_ab"}).json()
         assert not d["st"]["summer_fat"] and d["st"]["summer_bmz"]
         d = gast.post(f"/a/{token}/aktion", json={"geraet": "fbf", "aktion": "akustik_ab"}).json()
@@ -231,27 +251,136 @@ with TestClient(app, base_url="http://testserver") as c:
     assert "gelöscht" in c.post(f"/objekte/{kid}/loeschen", data={"csrf": tok}).text
     assert c.get(f"/objekte/{kid}").status_code == 404
 
-    # Benutzer
-    assert c.get("/hilfe").status_code == 200 and c.get("/konto").status_code == 200
-    assert "mindestens 12" in c.post("/benutzer/speichern", data={"csrf": tok, "username": "anna", "password": "kurz"}).text
-    assert "angelegt" in c.post("/benutzer/speichern", data={"csrf": tok, "username": "anna", "password": "anna-passwort-1"}).text
+    # Benutzer und Rechte
+    assert c.get("/hilfe").status_code == 200 and "Rolle: Administrator" in c.get("/konto").text
+    r = c.get("/benutzer")
+    assert "Benutzer anlegen" in r.text and 'class="dot on"' in r.text
+    def rechte(**p):
+        return {f"p_{k}": str(v) for k, v in p.items()}
+    assert "mindestens 12" in c.post("/benutzer/speichern", data={"csrf": tok, "username": "anna", "password": "kurz", **rechte(objekte=2, uebung=2, protokoll=2, users=0)}).text
+    r = c.post("/benutzer/speichern", data={"csrf": tok, "username": "anna", "password": "anna-passwort-1", "objekt": [str(oid)],
+                                           **rechte(objekte=2, uebung=2, protokoll=1, users=0)})
+    assert "gespeichert" in r.text and "Angepasst" in r.text and "Testhalle" in r.text
     assert "gibt es schon" in c.post("/benutzer/speichern", data={"csrf": tok, "username": "Anna", "password": "anna-passwort-1"}).text
     assert "nicht löschen" in c.post("/benutzer/1/loeschen", data={"csrf": tok}).text
+    assert "nicht selbst nehmen" in c.post("/benutzer/speichern", data={"csrf": tok, "id": "1", **rechte(objekte=2, uebung=2, protokoll=2, users=0)}).text
+    with m.SessionLocal() as db:
+        anna = db.query(m.User).filter_by(username="anna").one()
+        assert access.role_of(anna) == "Angepasst" and not access.sees_all(anna) and access.objekt_ids(anna) == {oid}
+        assert access.role_of(db.get(m.User, 1)) == "Administrator"
+        alt = m.User(username="alt", password_hash="x", is_admin=False)  # Konto aus Version 1.0 ohne eigene Rechte
+        assert access.role_of(alt) == "Ausbilder" and access.sees_all(alt)
+        alt.is_admin = True
+        assert access.role_of(alt) == "Administrator"
     with TestClient(app, base_url="http://testserver") as a:
         t2 = csrf(a.get("/login").text)
         r = a.post("/login", data={"csrf": t2, "username": "anna", "password": "anna-passwort-1"})
-        assert "Übung öffnen" in r.text and 'href="/benutzer"' not in r.text
-        assert a.get("/benutzer").status_code == 403, "Ausbilder verwalten keine Benutzer"
+        assert r.text.count("Übung öffnen") == 1 and "Testhalle" in r.text and "Seniorenheim" not in r.text, "nur das freigegebene Objekt"
+        assert 'href="/benutzer"' not in r.text and 'href="/sicherung"' not in r.text
         t2 = csrf(r.text)
+        for pfad in ("/benutzer", "/benutzer/neu", "/sicherung"):
+            r = a.get(pfad)
+            assert r.status_code == 403 and "Kein Zugriff" in r.text, pfad
+        assert a.post("/sicherung/herunterladen", data={"csrf": t2}).status_code == 403
+        assert a.get("/objekte/1").status_code == 404 and a.get("/objekte/1/state").status_code == 404, "fremdes Objekt ist unsichtbar"
+        assert a.post("/objekte/1/aktion", json={"aktion": "grundstellung"}, headers={"X-CSRF": t2}).status_code == 404
+        assert a.get("/objekte/1/melder.csv").status_code == 404 and a.post("/objekte/1/loeschen", data={"csrf": t2}).status_code == 404
+        assert a.post(f"/objekte/{oid}/aktion", json={"aktion": "grundstellung"}, headers={"X-CSRF": t2}).status_code == 200
+        r = a.get(f"/objekte/{oid}")
+        assert "Übungsprotokoll" in r.text and "protokoll/leeren" not in r.text
+        assert a.post(f"/objekte/{oid}/protokoll/leeren", data={"csrf": t2}).status_code == 403, "Protokoll nur sehen"
+        r = a.post("/objekte/speichern", data={"csrf": t2, "id": "", "name": "Annas Halle"})
+        assert "Melderliste: Annas Halle" in r.text and a.get("/").text.count("Übung öffnen") == 2, "selbst angelegtes Objekt ist freigegeben"
         assert "stimmt nicht" in a.post("/konto", data={"csrf": t2, "alt": "falsch", "neu": "neues-passwort-1", "neu2": "neues-passwort-1"}).text
         assert "geändert" in a.post("/konto", data={"csrf": t2, "alt": "anna-passwort-1", "neu": "neues-passwort-1", "neu2": "neues-passwort-1"}).text
         assert a.post("/logout", data={"csrf": t2}).status_code == 200 and a.get("/", follow_redirects=False).status_code == 303
-    assert "gelöscht" in c.post("/benutzer/2/loeschen", data={"csrf": tok}).text
+    with m.SessionLocal() as db:
+        assert db.get(m.User, anna.id).last_seen is None, "nach dem Abmelden nicht mehr als aktiv geführt"
+
+    # Beobachter: sieht zu, löst nichts aus; Anlage ohne Passwort ergibt einen Einmal-Link
+    r = c.post("/benutzer/speichern", data={"csrf": tok, "username": "ben", "password": "", "all_objekte": "on", **rechte(objekte=1, uebung=1, protokoll=0, users=0)})
+    link = re.search(r"/einladung/([\w-]+)", r.text).group(1)
+    assert "Gib ihm den Link" in r.text
+    with m.SessionLocal() as db:
+        ben = db.query(m.User).filter_by(username="ben").one()
+        assert ben.password_hash == "" and link not in ben.invite_hash and len(ben.invite_hash) == 64, "gespeichert ist nur der Hash"
+    assert link not in c.get(f"/benutzer/{ben.id}/bearbeiten").text, "der Link wird nur einmal gezeigt"
+    assert "Einladung offen" in c.get("/benutzer").text
+    with TestClient(app, base_url="http://testserver") as b:
+        t3 = csrf(b.get("/login").text)
+        assert "falsch" in b.post("/login", data={"csrf": t3, "username": "ben", "password": ""}).text, "ohne Passwort keine Anmeldung"
+        assert "ungültig oder abgelaufen" in b.get("/einladung/gibtsnicht").text
+        r = b.get(f"/einladung/{link}")
+        assert "Hallo <strong>ben</strong>" in r.text
+        t3 = csrf(r.text)
+        assert "beide Eingaben" in b.post(f"/einladung/{link}", data={"csrf": t3, "password": "bens-passwort-1", "repeat": "anders"}).text
+        assert "Du kannst dich jetzt anmelden" in b.post(f"/einladung/{link}", data={"csrf": t3, "password": "bens-passwort-1", "repeat": "bens-passwort-1"}).text
+        assert "ungültig oder abgelaufen" in b.get(f"/einladung/{link}").text, "der Link gilt nur einmal"
+        r = b.post("/login", data={"csrf": csrf(b.get("/login").text), "username": "ben", "password": "bens-passwort-1"})
+        assert "Übung ansehen" in r.text and "Neues Objekt" not in r.text
+        t3 = csrf(r.text)
+        r = b.get(f"/objekte/{oid}")
+        assert 'data-steuern="0"' in r.text and "Grundstellung" not in r.text and "Übungsprotokoll" not in r.text and "Live-Bild" in r.text
+        assert "protokoll" not in b.get(f"/objekte/{oid}/state").json()
+        r = b.post(f"/objekte/{oid}/aktion", json={"aktion": "grundstellung"}, headers={"X-CSRF": t3})
+        assert r.status_code == 403 and "Übungen" in r.json()["detail"]
+        assert b.get(f"/objekte/{oid}/protokoll.csv").status_code == 403 and b.get("/objekte/neu").status_code == 403
+        assert b.post(f"/objekte/{oid}/melder/import", data={"csrf": t3, "liste": "1;1;rm"}).status_code == 403
+        r = b.get(f"/objekte/{oid}/melder")
+        assert r.status_code == 200 and "Liste einlesen" not in r.text and "Löschen" not in r.text
+    r = c.post(f"/benutzer/{ben.id}/einladung", data={"csrf": tok})
+    assert "/einladung/" in r.text and "Neuer Link erzeugt" in r.text
+    r = c.post("/benutzer/speichern", data={"csrf": tok, "id": str(ben.id), "all_objekte": "on", **rechte(objekte=1, uebung=1, protokoll=1, users=0)})
+    assert "Beobachter" in r.text
+    assert "gelöscht" in c.post(f"/benutzer/{ben.id}/loeschen", data={"csrf": tok}).text
+    assert "gelöscht" in c.post(f"/benutzer/{anna.id}/loeschen", data={"csrf": tok}).text
+
+    # Sicherung
+    import io, sqlite3, zipfile
+    r = c.get("/sicherung")
+    assert "Noch keine Sicherung abgelegt" in r.text and backup.auto_due()
+    r = c.post("/sicherung/herunterladen", data={"csrf": tok})
+    assert r.headers["content-type"] == "application/zip" and re.search(r'bma-simulator-\d{8}-\d{6}\.zip', r.headers["content-disposition"])
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        assert sorted(z.namelist()) == ["LIESMICH.txt", "simulator.db"] and "Wiederherstellen" in z.read("LIESMICH.txt").decode()
+        ziel = os.path.join(tempfile.mkdtemp(), "simulator.db")
+        open(ziel, "wb").write(z.read("simulator.db"))
+    con = sqlite3.connect(ziel)
+    assert con.execute("select count(*) from objekte").fetchone()[0] == 6 and con.execute("pragma integrity_check").fetchone()[0] == "ok"
+    con.close()
+    r = c.post("/sicherung/ablegen", data={"csrf": tok})
+    name = re.search(r"bma-simulator-\d{8}-\d{6}\.zip", r.text).group(0)
+    assert "abgelegt" in r.text and not backup.auto_due() and c.get(f"/sicherung/datei/{name}").content[:2] == b"PK"
+    assert c.get("/sicherung/datei/..%2Fsimulator.db").status_code == 404 and backup.path_of("../simulator.db") is None
+    assert backup.store(auto=True).endswith("-auto.zip") and "automatisch" in c.get("/sicherung").text
+    assert "gelöscht" in c.post(f"/sicherung/datei/{name}/loeschen", data={"csrf": tok}).text and backup.path_of(name) is None
 
     # Anmeldesperre nach fünf Fehlversuchen
     with TestClient(app, base_url="http://testserver") as b:
         for _ in range(5):
             b.post("/login", data={"csrf": csrf(b.get("/login").text), "username": "admin", "password": "falsch"})
         assert "Zu viele Fehlversuche" in b.post("/login", data={"csrf": csrf(b.get("/login").text), "username": "admin", "password": "test-passwort-123"}).text
+
+# Datenbank aus Version 1.0: fehlende Spalten kommen beim Start dazu, alte Konten behalten ihre Rolle
+import sqlite3  # noqa: E402
+
+alt_db = os.path.join(m.DATA_DIR, "alt.db")
+con = sqlite3.connect(alt_db)
+con.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(80), password_hash VARCHAR(200), is_admin BOOLEAN NOT NULL DEFAULT 0, last_login DATETIME)")
+con.execute("INSERT INTO users (username, password_hash, is_admin) VALUES ('chef', 'x', 1), ('azubi', 'x', 0)")
+con.commit()
+con.close()
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+
+haupt, m.engine = m.engine, create_engine(f"sqlite:///{alt_db}")
+try:
+    m.add_missing_columns()
+    m.add_missing_columns()  # zweiter Lauf ändert nichts
+    with Session(m.engine) as db:
+        rollen = {u.username: (access.role_of(u), access.sees_all(u)) for u in db.query(m.User)}
+    assert rollen == {"chef": ("Administrator", True), "azubi": ("Ausbilder", True)}, rollen
+finally:
+    m.engine = haupt
 
 print("Alle Prüfungen bestanden.")

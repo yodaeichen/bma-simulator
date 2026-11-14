@@ -4,14 +4,16 @@
 {% block content %}
 <div class="row">
   <div><h1>{{ o.name }} <span class="tag" id="lage">…</span></h1>
-    <p class="hint">Ausbilderansicht{% if o.bma_nr %} &middot; {{ o.bma_nr }}{% endif %}{% if o.adresse %} &middot; {{ o.adresse }}{% endif %}</p></div>
-  <div><a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a> <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a></div>
+    <p class="hint">{{ "Ausbilderansicht" if perm.uebung == 2 else "Ausbilderansicht, nur zum Zusehen" }}{% if o.bma_nr %} &middot; {{ o.bma_nr }}{% endif %}{% if o.adresse %} &middot; {{ o.adresse }}{% endif %}</p></div>
+  <div><a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a>{% if perm.objekte == 2 %} <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div>
 </div>
 {% if o.hinweis %}<div class="flash note">{{ o.hinweis }}</div>{% endif %}
 <div class="flash err" id="offline" hidden>Keine Verbindung zum Server. Die Ansicht aktualisiert sich, sobald er wieder erreichbar ist.</div>
 
-<div id="leitstand" class="leitstand" data-id="{{ o.id }}" data-csrf="{{ csrf }}">
+{% set steuern = perm.uebung == 2 %}
+<div id="leitstand" class="leitstand{{ '' if steuern else ' nurlesen' }}" data-id="{{ o.id }}" data-csrf="{{ csrf }}" data-steuern="{{ 1 if steuern else 0 }}">
   <section>
+    {% if steuern %}
     <div class="card werkzeug">
       <fieldset class="modus">
         <legend>Ein Klick auf einen Melder …</legend>
@@ -27,8 +29,9 @@
       <p class="hint">Ausbreitung: Nach dem ersten Melder sprechen bis zu vier weitere automatische Melder derselben Gruppe und Etage an.
         „Ursache steht an“: Der Melder löst nach dem Rückstellen erneut aus, bis die Ursache hier als beseitigt markiert wird.</p>
     </div>
+    {% endif %}
 
-    {% if not o.gruppen %}<div class="card"><p>Dieses Objekt hat noch keine Melder.</p><a class="btn" href="/objekte/{{ o.id }}/melder">Melderliste anlegen</a></div>{% endif %}
+    {% if not o.gruppen %}<div class="card"><p>Dieses Objekt hat noch keine Melder.</p>{% if perm.objekte == 2 %}<a class="btn" href="/objekte/{{ o.id }}/melder">Melderliste anlegen</a>{% endif %}</div>{% endif %}
     <nav class="etagen" id="etagen" aria-label="Etage wählen">
       <button type="button" class="on" data-etage="*">Alle Etagen</button>
       {% for e in etagen %}<button type="button" data-etage="{{ e }}">{{ e or "Ohne Etage" }} <b hidden></b></button>{% endfor %}
@@ -39,7 +42,7 @@
       {% for g in o.gruppen if g.etage == e %}
       <div class="gruppe" data-g="{{ g.nummer }}">
         <div class="gkopf"><strong>{{ nr(g.nummer) }}</strong> {{ g.name }}
-          <button type="button" class="light klein" data-gruppe-ab="{{ g.id }}">Gruppe abschalten</button></div>
+          {% if steuern %}<button type="button" class="light klein" data-gruppe-ab="{{ g.id }}">Gruppe abschalten</button>{% endif %}</div>
         <div class="chips">
           {% for x in g.melder %}
           <button type="button" class="chip" data-melder="{{ x.id }}" data-g="{{ g.nummer }}" data-m="{{ x.nummer }}" title="{{ typen.get(x.typ, x.typ) }}">
@@ -65,11 +68,19 @@
         <li data-l="bfs_ab"><i class="led gelb"></i>Brandfallsteuerungen abgeschaltet</li>
         <li data-l="summer"><i class="led gelb"></i>Summer an FAT oder BMZ läuft</li>
       </ul>
+      {% if steuern %}
       <div class="actions wrap">
         <button type="button" class="light" data-aktion="ruecksetzen">BMZ rückstellen</button>
         {% if o.loeschanlage %}<button type="button" class="light" data-aktion="loeschanlage">Löschanlage auslösen</button>{% endif %}
         <button type="button" data-aktion="grundstellung" data-frage="Alles zurücksetzen, auch Störungen, Abschaltungen und die Schalter am FBF?">Grundstellung</button>
       </div>
+      {% endif %}
+    </div>
+
+    <div class="card" id="live-karte">
+      <h2>Live-Bild der Übenden <span class="tag" id="live-anzahl">0</span></h2>
+      <div id="live"></div>
+      <p class="hint" id="live-leer">Noch keine Anzeige geöffnet. Sobald ein Gerät die Adresse unten aufruft, erscheint hier, was es gerade zeigt und was dort gedrückt wird.</p>
     </div>
 
     <div class="card">
@@ -77,7 +88,8 @@
       <ul class="meldungen" id="meldungen"></ul>
       <p class="hint" id="keine">Keine Meldungen. Die Anlage ist in Ruhe.</p>
       <div id="vorgemerkt" hidden><p class="hint"><span id="vorgemerkt-text"></span>
-        <button type="button" class="link" data-aktion="vormerkungen_loeschen">verwerfen</button></p></div>
+        {% if steuern %}<button type="button" class="link" data-aktion="vormerkungen_loeschen">verwerfen</button>{% endif %}</p></div>
+      {% if steuern %}
       <h3>Störung ohne Melder</h3>
       <div class="actions wrap">
         <button type="button" class="light klein" data-stoerung="Netzausfall">Netzausfall</button>
@@ -85,6 +97,7 @@
         <button type="button" class="light klein" data-stoerung="ÜE-Leitung gestört">ÜE-Leitung</button>
         <button type="button" class="light klein" data-stoerung="Erdschluss">Erdschluss</button>
       </div>
+      {% endif %}
     </div>
 
     <div class="card">
@@ -97,19 +110,21 @@
             <a class="btn light klein" href="/a/{{ o.token }}/bmz" target="_blank" rel="noopener">BMZ</a>
             <a class="btn light klein" href="/a/{{ o.token }}/verzeichnis" target="_blank" rel="noopener">Verzeichnis</a>
           </div>
-          <form method="post" action="/objekte/{{ o.id }}/link-erneuern"><input type="hidden" name="csrf" value="{{ csrf }}">
-            <button class="link" data-frage="Neue Adresse vergeben? Geöffnete Anzeigen verlieren die Verbindung.">Adresse erneuern</button></form>
+          {% if perm.objekte == 2 %}<form method="post" action="/objekte/{{ o.id }}/link-erneuern"><input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="link" data-frage="Neue Adresse vergeben? Geöffnete Anzeigen verlieren die Verbindung.">Adresse erneuern</button></form>{% endif %}
         </div></div>
     </div>
 
+    {% if perm.protokoll %}
     <div class="card">
       <div class="row"><h2>Übungsprotokoll</h2>
         <div><a class="btn light klein" href="/objekte/{{ o.id }}/protokoll.csv">CSV</a>
-          <form class="inline" method="post" action="/objekte/{{ o.id }}/protokoll/leeren"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Protokoll dieses Objekts leeren?">Leeren</button></form></div></div>
+          {% if perm.protokoll == 2 %}<form class="inline" method="post" action="/objekte/{{ o.id }}/protokoll/leeren"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Protokoll dieses Objekts leeren?">Leeren</button></form>{% endif %}</div></div>
       <ol class="protokoll" id="protokoll"></ol>
     </div>
+    {% endif %}
   </aside>
 </div>
 <script src="/static/frage.js?v=1"></script>
-<script src="/static/leitstand.js?v=1"></script>
+<script src="/static/leitstand.js?v=2"></script>
 {% endblock %}

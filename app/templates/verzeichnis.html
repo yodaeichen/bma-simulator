@@ -3,7 +3,7 @@
 {% block bodyclass %}seite-verzeichnis{% endblock %}
 {% block leiste %}{% endblock %}
 {% block content %}
-<main class="verzeichnis">
+<main class="verzeichnis" id="da" data-token="{{ o.token }}" data-geraet="verz">
   <h1>Meldergruppenverzeichnis</h1>
   <p>{{ o.name }}{% if o.adresse %}, {{ o.adresse }}{% endif %}</p>
   {% for e in etagen %}
@@ -17,4 +17,5 @@
   </table>
   {% endfor %}
 </main>
+<script src="/static/praesenz.js?v=1"></script>
 {% endblock %}

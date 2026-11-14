@@ -3,7 +3,8 @@
   "use strict";
   var root = document.getElementById("leitstand");
   if (!root) return;
-  var id = root.dataset.id, csrf = root.dataset.csrf, v = 0, st = null;
+  var id = root.dataset.id, csrf = root.dataset.csrf, v = 0, pv = "", st = null, steuern = root.dataset.steuern === "1";
+  var EBENEN = { alarm: "Alarm", stoerung: "Störung", abschaltung: "Abschaltung" };
   var ARTEN = { alarm: "Feuer", stoerung: "Störung", abschaltung: "Abschaltung" };
   var TYPEN = { rm: "Rauchmelder", wm: "Wärmemelder", mm: "Mehrkriterienmelder", fm: "Flammenmelder", gm: "Gasmelder",
     lm: "Linearer Rauchmelder", ras: "Rauchansaugsystem", hfm: "Handfeuermelder", spr: "Sprinklergruppe" };
@@ -33,7 +34,7 @@
       .catch(function () { offline(true); });
   }
   function holen() {
-    fetch("/objekte/" + id + "/state?v=" + v, { credentials: "same-origin" })
+    fetch("/objekte/" + id + "/state?v=" + v + "&pv=" + pv, { credentials: "same-origin" })
       .then(antwort).then(function (d) { offline(false); if (d) zeigen(d); })
       .catch(function () { offline(true); })
       .then(function () { window.setTimeout(holen, 1000); });
@@ -60,7 +61,8 @@
       var g = Number(box.dataset.g);
       var ab = st.meldungen.some(function (x) { return x.art === "abschaltung" && x.gruppe === g && x.melder === null; });
       box.classList.toggle("ab", ab);
-      box.querySelector("[data-gruppe-ab]").textContent = ab ? "Gruppe einschalten" : "Gruppe abschalten";
+      var knopf = box.querySelector("[data-gruppe-ab]");
+      if (knopf) knopf.textContent = ab ? "Gruppe einschalten" : "Gruppe abschalten";
     });
 
     // Lampen
@@ -85,18 +87,18 @@
       li.appendChild(kopf);
       li.appendChild(el("div", "ort", [x.etage, x.gname, x.ort].filter(function (s, i, a) { return s && a.indexOf(s) === i; }).join(" · ")));
       var tun = el("div", "tun");
-      if (x.art === "alarm") {
+      if (x.art === "alarm" && x.etage != null) proEtage[x.etage] = (proEtage[x.etage] || 0) + 1;
+      if (x.art === "alarm" && !steuern && x.ansteht) li.appendChild(el("div", "ort", "Ursache steht an"));
+      if (x.art === "alarm" && steuern) {
         var u = el("button", "link", x.ansteht ? "Ursache steht an: jetzt beseitigen" : "Ursache als anstehend markieren");
         u.type = "button";
         u.addEventListener("click", function () { senden({ aktion: "ursache", id: x.id, ansteht: !x.ansteht }); });
         tun.appendChild(u);
-        if (x.etage != null) proEtage[x.etage] = (proEtage[x.etage] || 0) + 1;
       }
       var weg = el("button", "link weg", x.art === "abschaltung" ? "Wieder einschalten" : "Entfernen");
       weg.type = "button";
       weg.addEventListener("click", function () { senden({ aktion: "entfernen", id: x.id }); });
-      tun.appendChild(weg);
-      li.appendChild(tun);
+      if (steuern) { tun.appendChild(weg); li.appendChild(tun); }
       liste.appendChild(li);
     });
     $("#anzahl").textContent = st.meldungen.length;
@@ -117,8 +119,11 @@
         " vorgemerkt, die nächste um " + uhr(naechste) + ".";
     }
 
+    zeigeLive(d.live || []);
+    pv = d.pv || "";
+
     // Protokoll
-    if (d.protokoll) {
+    if (d.protokoll && $("#protokoll")) {
       var p = $("#protokoll");
       p.textContent = "";
       d.protokoll.forEach(function (z) {
@@ -131,6 +136,33 @@
     }
   }
 
+  // Live-Bild: je geöffneter Anzeige eine kleine Kachel mit dem Text der Anzeige und der letzten Taste
+  function zeigeLive(geraete) {
+    var kasten = $("#live");
+    kasten.textContent = "";
+    geraete.forEach(function (g) {
+      var k = el("div", "geraet-live"), kopf = el("div", "kopf");
+      kopf.appendChild(el("i", "dot on"));
+      kopf.appendChild(el("b", null, g.name));
+      kopf.appendChild(el("span", null, "Gerät " + g.id + " · seit " + uhr(g.seit)));
+      k.appendChild(kopf);
+      if ((g.geraet === "fat" || g.geraet === "bmz") && g.lcd.length) {
+        var zeilen = g.lcd.slice();
+        while (zeilen.length > 1 && !zeilen[zeilen.length - 1].trim()) zeilen.pop();  // leere Zeilen am Ende sparen Platz
+        k.appendChild(el("pre", "minilcd " + g.geraet, zeilen.join("\n")));
+        var marken = el("div", "marken");
+        marken.appendChild(el("span", "tag", "Ebene: " + (EBENEN[g.ebene] || g.ebene)));
+        marken.appendChild(el("span", "tag" + (g.offen ? " gesendet" : ""), g.geraet === "fat" ? (g.offen ? "FBF aufgeschlossen" : "FBF verschlossen") : (g.offen ? "Bedienung frei" : "Bedienung gesperrt")));
+        marken.appendChild(el("span", "tag" + (g.ton ? "" : " test"), g.ton ? "Ton an" : "Ton aus"));
+        k.appendChild(marken);
+      }
+      if (g.taste) k.appendChild(el("div", "letzte", "Zuletzt gedrückt: " + g.taste + " (" + uhr(g.taste_zeit) + ")"));
+      kasten.appendChild(k);
+    });
+    $("#live-anzahl").textContent = geraete.length;
+    $("#live-leer").hidden = geraete.length > 0;
+  }
+
   function modus() { return document.querySelector('input[name="modus"]:checked').value; }
   function zahl(sel) { return Math.max(0, parseInt($(sel).value, 10) || 0); }
 
@@ -141,6 +173,7 @@
   document.addEventListener("click", function (ev) {
     if (ev.defaultPrevented) return;
     var chip = ev.target.closest(".chip");
+    if (chip && !steuern) return;
     if (chip) {
       var mid = Number(chip.dataset.melder);
       if (modus() === "alarm") senden({ aktion: "alarm", melder_id: mid, sekunden: zahl("#sekunden"), ausbreitung: zahl("#ausbreitung"), ansteht: $("#ansteht").checked });

@@ -2,11 +2,12 @@
 {% block bodyclass %}seite-wahl{% endblock %}
 {% block leiste %}{% endblock %}
 {% block content %}
-<main class="wahl">
+<main class="wahl" id="da" data-token="{{ o.token }}" data-geraet="wahl">
   <h1>{{ o.name }}</h1>
   <p>{{ o.adresse }}</p>
   <a class="kachel" href="/a/{{ o.token }}/fat"><strong>FAT und FBF</strong><span>Feuerwehr-Anzeigetableau und Feuerwehr-Bedienfeld, wie in der Feuerwehr-Informationszentrale</span></a>
   <a class="kachel" href="/a/{{ o.token }}/bmz"><strong>BMZ</strong><span>Anzeige- und Bedienteil der Brandmelderzentrale</span></a>
   <a class="kachel" href="/a/{{ o.token }}/verzeichnis"><strong>Meldergruppen</strong><span>Verzeichnis der Gruppen und Melder, als Ersatz für die Laufkarten</span></a>
 </main>
+<script src="/static/praesenz.js?v=1"></script>
 {% endblock %}

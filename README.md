@@ -10,11 +10,13 @@ Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md). Die laufen
 | Ansicht | Für wen | Wofür |
 |---|---|---|
 | **Objekte** | Ausbilder | Übersicht aller Objekte mit ihrem Zustand |
-| **Übung** (Ausbilderansicht) | Ausbilder | Melder nach Etagen und Gruppen, auslösen, stören, abschalten; Zustand der Anlage; Protokoll |
+| **Übung** (Ausbilderansicht) | Ausbilder | Melder nach Etagen und Gruppen, auslösen, stören, abschalten; Zustand der Anlage; Live-Bild der Übenden; Protokoll |
 | **Melderliste** | Ausbilder | Gruppen und Melder eines Objekts anlegen, als CSV einlesen und herunterladen |
 | **FAT und FBF** | Übende | Feuerwehr-Anzeigetableau und Feuerwehr-Bedienfeld |
 | **BMZ** | Übende | Anzeige- und Bedienteil der Brandmelderzentrale |
 | **Meldergruppen** | Übende | Verzeichnis der Gruppen und Melder, als Ersatz für die Laufkarten |
+| **Benutzer** | Administrator | Benutzer anlegen, Rechte je Bereich, Beschränkung auf Objekte, Einmal-Link für das Passwort |
+| **Sicherung** | Administrator | Datenbank herunterladen oder auf dem Server ablegen |
 
 Die Ansichten der Übenden brauchen keine Anmeldung. Sie liegen unter einer Adresse mit geheimem Teil
 (`/a/<token>`), die die Ausbilderansicht als Link und QR-Code zeigt. „Adresse erneuern" macht die alte ungültig.
@@ -35,6 +37,28 @@ Bedienteil ohne Vorbild eines bestimmten Herstellers. Der Simulator ersetzt kein
   Abgeschaltete Melder lösen nicht aus.
 - **Löschanlage:** Eine ausgelöste Sprinklergruppe setzt „Löschanlage ausgelöst".
 - **Übungsprotokoll:** Jede Auslösung und jede Bedienung mit Uhrzeit und Gerät, als CSV für die Nachbesprechung.
+
+## Live-Bild der Übenden
+
+Die Ausbilderansicht zeigt für jede geöffnete Anzeige eine kleine Kachel: den Text, den FAT oder BMZ gerade zeigt,
+die Anzeigeebene, ob das FBF aufgeschlossen ist, ob der Ton eingeschaltet ist und welche Taste zuletzt gedrückt wurde,
+auch wenn sie ohne Wirkung blieb (verschlossenes FBF). Ein Gerät, das sich sechs Sekunden nicht meldet, verschwindet.
+Das Live-Bild wird nicht gespeichert; was die Anlage verändert, steht wie bisher im Übungsprotokoll.
+
+## Benutzer und Rechte
+
+| Bereich | Stufen |
+|---|---|
+| Objekte und Melderlisten | nur sehen, bearbeiten |
+| Übungen | kein Zugriff, zusehen, steuern |
+| Übungsprotokoll | kein Zugriff, sehen, sehen und leeren |
+| Benutzer, Rechte und Sicherung | kein Zugriff, verwalten |
+
+Die Rollen **Administrator**, **Ausbilder** und **Beobachter** füllen diese Rechte als Vorlage aus; danach lässt sich jedes
+Recht einzeln ändern. Je Benutzer lässt sich festlegen, ob er alle Objekte sieht oder nur ausgewählte.
+
+Wird ein Benutzer ohne Passwort angelegt, zeigt der Simulator einmalig einen Link, über den der Benutzer sein Passwort
+selbst festlegt (48 Stunden gültig, nur einmal verwendbar). „Neuen Einmal-Link erzeugen" hilft bei vergessenem Passwort.
 
 ## Installation auf Proxmox (Einzeiler)
 
@@ -85,8 +109,25 @@ pct exec <CTID> -- /usr/local/bin/bma-simulator-update
 | `/opt/bma-simulator` | Programm |
 | `/var/lib/bma-simulator/simulator.db` | Datenbank (Objekte, Melder, Benutzer, Protokolle) |
 | `/etc/bma-simulator.env` | Einstellungen und `SECRET_KEY` |
+| `/var/lib/bma-simulator/backups` | Sicherungen (automatisch und per Knopf) |
 | `/root/bma-simulator-zugang.txt` | Startpasswort (nach der ersten Anmeldung löschen) |
 | `journalctl -u bma-simulator` | Dienstprotokoll |
+
+### Sicherung und Wiederherstellung
+
+Unter **Sicherung** lässt sich die ganze Datenbank (Objekte, Melderlisten, Benutzer, Rechte, Protokolle) als ZIP
+herunterladen oder auf dem Server ablegen. Zusätzlich legt der Simulator alle 24 Stunden selbst eine Sicherung ab und
+behält die neuesten 14 (`BACKUP_HOURS`, `BACKUP_KEEP` in `/etc/bma-simulator.env`; `BACKUP_HOURS=0` schaltet die Automatik ab).
+Der `SECRET_KEY` wird für die Wiederherstellung nicht gebraucht. Wiederherstellen:
+
+```bash
+pct push <CTID> sicherung.zip /root/sicherung.zip
+pct exec <CTID> -- systemctl stop bma-simulator
+pct exec <CTID> -- python3 -m zipfile -e /root/sicherung.zip /root/sicherung
+pct exec <CTID> -- bash -c 'rm -f /var/lib/bma-simulator/simulator.db-wal /var/lib/bma-simulator/simulator.db-shm'
+pct exec <CTID> -- install -o bma-sim -g bma-sim -m 600 /root/sicherung/simulator.db /var/lib/bma-simulator/simulator.db
+pct exec <CTID> -- systemctl start bma-simulator
+```
 
 Dasselbe Installationsskript läuft auch auf jeder Debian- oder Ubuntu-Maschine ohne Proxmox:
 

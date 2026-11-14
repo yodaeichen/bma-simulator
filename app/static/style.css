@@ -96,3 +96,19 @@ ol.protokoll time { color:var(--muted); font-variant-numeric:tabular-nums; } ol.
 .helpnav { margin:-6px 0 16px; color:var(--muted); } ol.steps { margin:0; padding-left:22px; } ol.steps li { padding:4px 0; }
 .faq details { border-top:1px solid var(--line); padding:9px 0; } .faq details:last-of-type { border-bottom:1px solid var(--line); }
 .faq summary { cursor:pointer; font-weight:600; } .faq details p { margin:8px 0 2px; color:#344054; }
+
+/* Benutzer, Rechte, Sicherung */
+.dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#c4cad4; margin-right:8px; } .dot.on { background:#2fa863; }
+td.detail { font-size:13px; color:var(--muted); max-width:460px; } table.rechte { margin-top:12px; } table.rechte label { margin:0; } table.rechte select { min-width:170px; }
+.picklist { border:1px solid #c4cad4; border-radius:6px; padding:6px 10px; max-height:220px; overflow:auto; background:#fff; margin-top:8px; } .picklist label.check { margin:3px 0; }
+.card.einladung { border-left:4px solid var(--ok); } .card.einladung code { display:block; padding:8px 10px; font-size:14px; user-select:all; }
+
+/* Live-Bild der Übenden in der Ausbilderansicht */
+.geraet-live { border:1px solid var(--line); border-radius:8px; padding:9px 11px; margin-bottom:8px; }
+.geraet-live .kopf { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; } .geraet-live .kopf .dot { margin-right:2px; align-self:center; }
+.geraet-live .kopf span { color:var(--muted); font-size:13px; }
+.minilcd { margin:8px 0 6px; background:#b9c88a; color:#1d2a12; border:3px solid #16181b; border-radius:4px; padding:5px 8px; white-space:pre; overflow:hidden;
+  font:700 13px/1.4 "DejaVu Sans Mono","Cascadia Mono",Consolas,"Liberation Mono",Menlo,monospace; }
+.minilcd.fat { width:calc(20ch + 22px); max-width:100%; } .minilcd.bmz { font-size:9.5px; line-height:1.45; }
+.geraet-live .marken { display:flex; gap:6px; flex-wrap:wrap; } .geraet-live .letzte { font-size:13px; color:#344054; margin-top:6px; }
+.nurlesen .chip { cursor:default; } .nurlesen .chip:hover { border-color:#c9ced8; }

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row"><h1>Objekte</h1><a class="btn" href="/objekte/neu">Neues Objekt</a></div>
+<div class="row"><h1>Objekte</h1>{% if perm.objekte == 2 %}<a class="btn" href="/objekte/neu">Neues Objekt</a>{% endif %}</div>
 {% if not karten %}
-<div class="card"><p>Noch kein Objekt angelegt. Ein Objekt ist ein Gebäude mit eigener Brandmeldeanlage: Etagen, Meldergruppen und Melder.</p>
-<a class="btn" href="/objekte/neu">Erstes Objekt anlegen</a></div>
+<div class="card">{% if perm.objekte == 2 %}<p>Noch kein Objekt angelegt. Ein Objekt ist ein Gebäude mit eigener Brandmeldeanlage: Etagen, Meldergruppen und Melder.</p>
+<a class="btn" href="/objekte/neu">Erstes Objekt anlegen</a>{% else %}<p>Dir ist noch kein Objekt freigegeben. Wende dich an die Person, die deinen Zugang verwaltet.</p>{% endif %}</div>
 {% endif %}
 <div class="tiles objekte">
 {% for k in karten %}
@@ -17,7 +17,7 @@
       {% else %}<span class="tag test">nicht in Grundstellung</span>{% endif %}
     </p>
     <div class="actions">
-      <a class="btn" href="/objekte/{{ k.o.id }}">Übung öffnen</a>
+      {% if perm.uebung %}<a class="btn" href="/objekte/{{ k.o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a>{% endif %}
       <a class="btn light" href="/objekte/{{ k.o.id }}/melder">Melderliste</a>
     </div>
   </div>
