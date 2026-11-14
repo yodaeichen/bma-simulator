@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Mein Konto</h1>
+<div class="card narrow">
+  <h2>Passwort ändern</h2>
+  <form method="post" action="/konto">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="alt">Bisheriges Passwort</label><input type="password" id="alt" name="alt" required autocomplete="current-password">
+    <label for="neu">Neues Passwort (mindestens 12 Zeichen)</label><input type="password" id="neu" name="neu" minlength="12" required autocomplete="new-password">
+    <label for="neu2">Neues Passwort wiederholen</label><input type="password" id="neu2" name="neu2" minlength="12" required autocomplete="new-password">
+    <div class="actions"><button>Ändern</button></div>
+  </form>
+</div>
+{% endblock %}

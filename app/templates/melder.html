@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row"><h1>Melderliste: {{ o.name }}</h1>
+  <div><a class="btn" href="/objekte/{{ o.id }}">Übung öffnen</a> <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a></div></div>
+
+<div class="card">
+  <h2>Melder hinzufügen oder ändern</h2>
+  <form method="post" action="/objekte/{{ o.id }}/melder/hinzufuegen">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="grid6">
+      <div><label for="gruppe">Gruppe</label><input type="number" id="gruppe" name="gruppe" min="1" max="9999" required></div>
+      <div><label for="melder">Melder</label><input type="number" id="melder" name="melder" min="1" max="99" required></div>
+      <div><label for="typ">Typ</label><select id="typ" name="typ">{% for kurz, name in typen.items() %}<option value="{{ kurz }}">{{ name }}</option>{% endfor %}</select></div>
+      <div><label for="etage">Etage / Bereich</label><input type="text" id="etage" name="etage" maxlength="40" list="etagen">
+        <datalist id="etagen">{% for e in etagen %}<option value="{{ e }}">{% endfor %}</datalist></div>
+      <div><label for="gname">Name der Gruppe</label><input type="text" id="gname" name="gname" maxlength="80"></div>
+      <div><label for="ort">Ort des Melders</label><input type="text" id="ort" name="ort" maxlength="80"></div>
+    </div>
+    <p class="hint">Gibt es die Gruppe schon, reichen Gruppe, Melder, Typ und Ort. Ein Melder mit gleicher Nummer wird überschrieben.
+      Das FAT zeigt vom Ort die ersten 20 Zeichen.</p>
+    <div class="actions"><button>Speichern</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="row"><h2>{{ o.gruppen|length }} Gruppen</h2><a class="btn light" href="/objekte/{{ o.id }}/melder.csv">Als CSV herunterladen</a></div>
+  {% if not o.gruppen %}<p class="hint">Noch keine Melder. Oben einzeln eintragen oder unten eine Liste einlesen.</p>{% endif %}
+  {% for e in etagen %}
+  <h3 class="etage">{{ e or "Ohne Etage" }}</h3>
+  <table class="melderliste">
+    <tr><th>Nummer</th><th>Typ</th><th>Ort</th><th></th></tr>
+    {% for g in o.gruppen if g.etage == e %}
+    <tr class="gruppe"><td><strong>{{ nr(g.nummer) }}</strong></td><td colspan="2"><strong>{{ g.name or "Gruppe ohne Namen" }}</strong></td>
+      <td class="r"><form class="inline" method="post" action="/gruppen/{{ g.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Gruppe {{ nr(g.nummer) }} mit {{ g.melder|length }} Meldern löschen?">Gruppe löschen</button></form></td></tr>
+    {% for x in g.melder %}
+    <tr><td>{{ nr(g.nummer, x.nummer) }}</td><td>{{ typen.get(x.typ, x.typ) }}</td><td>{{ x.ort }}</td>
+      <td class="r"><form class="inline" method="post" action="/melder/{{ x.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Löschen</button></form></td></tr>
+    {% endfor %}
+    {% endfor %}
+  </table>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Liste einlesen</h2>
+  <p class="hint">Je Zeile ein Melder, Spalten getrennt durch Semikolon, Komma oder Tabulator (aus Excel kopieren geht):<br>
+    <code>{{ kopf }}</code><br>
+    Typen: {% for kurz, name in typen.items() %}<code>{{ kurz }}</code> {{ name }}{{ ", " if not loop.last }}{% endfor %}</p>
+  <form method="post" action="/objekte/{{ o.id }}/melder/import" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="liste">Liste</label>
+    <textarea id="liste" name="liste" rows="7" placeholder="1;1;hfm;EG;Haupteingang;Windfang&#10;2;1;rm;EG;Foyer;Foyer Mitte"></textarea>
+    <label for="datei">oder CSV-Datei</label><input type="file" id="datei" name="datei" accept=".csv,.txt,text/csv">
+    <label class="check"><input type="checkbox" name="ersetzen"> Vorhandene Melderliste vorher löschen</label>
+    <div class="actions"><button>Einlesen</button></div>
+  </form>
+</div>
+<script src="/static/frage.js?v=1"></script>
+{% endblock %}

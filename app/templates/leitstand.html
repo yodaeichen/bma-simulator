@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ o.name }} · Ausbilder{% endblock %}
+{% block mainattr %} class="breit"{% endblock %}
+{% block content %}
+<div class="row">
+  <div><h1>{{ o.name }} <span class="tag" id="lage">…</span></h1>
+    <p class="hint">Ausbilderansicht{% if o.bma_nr %} &middot; {{ o.bma_nr }}{% endif %}{% if o.adresse %} &middot; {{ o.adresse }}{% endif %}</p></div>
+  <div><a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a> <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a></div>
+</div>
+{% if o.hinweis %}<div class="flash note">{{ o.hinweis }}</div>{% endif %}
+<div class="flash err" id="offline" hidden>Keine Verbindung zum Server. Die Ansicht aktualisiert sich, sobald er wieder erreichbar ist.</div>
+
+<div id="leitstand" class="leitstand" data-id="{{ o.id }}" data-csrf="{{ csrf }}">
+  <section>
+    <div class="card werkzeug">
+      <fieldset class="modus">
+        <legend>Ein Klick auf einen Melder …</legend>
+        <label><input type="radio" name="modus" value="alarm" checked> löst Alarm aus</label>
+        <label><input type="radio" name="modus" value="stoerung"> meldet eine Störung</label>
+        <label><input type="radio" name="modus" value="abschaltung"> schaltet ihn ab / ein</label>
+      </fieldset>
+      <div class="optionen" id="optionen">
+        <label for="sekunden">Verzögerung <input type="number" id="sekunden" min="0" max="3600" value="0"> s</label>
+        <label for="ausbreitung">Ausbreitung alle <input type="number" id="ausbreitung" min="0" max="600" value="0"> s</label>
+        <label class="check"><input type="checkbox" id="ansteht"> Ursache steht an</label>
+      </div>
+      <p class="hint">Ausbreitung: Nach dem ersten Melder sprechen bis zu vier weitere automatische Melder derselben Gruppe und Etage an.
+        „Ursache steht an“: Der Melder löst nach dem Rückstellen erneut aus, bis die Ursache hier als beseitigt markiert wird.</p>
+    </div>
+
+    {% if not o.gruppen %}<div class="card"><p>Dieses Objekt hat noch keine Melder.</p><a class="btn" href="/objekte/{{ o.id }}/melder">Melderliste anlegen</a></div>{% endif %}
+    <nav class="etagen" id="etagen" aria-label="Etage wählen">
+      <button type="button" class="on" data-etage="*">Alle Etagen</button>
+      {% for e in etagen %}<button type="button" data-etage="{{ e }}">{{ e or "Ohne Etage" }} <b hidden></b></button>{% endfor %}
+    </nav>
+    {% for e in etagen %}
+    <div class="etage" data-etage="{{ e }}">
+      <h2>{{ e or "Ohne Etage" }}</h2>
+      {% for g in o.gruppen if g.etage == e %}
+      <div class="gruppe" data-g="{{ g.nummer }}">
+        <div class="gkopf"><strong>{{ nr(g.nummer) }}</strong> {{ g.name }}
+          <button type="button" class="light klein" data-gruppe-ab="{{ g.id }}">Gruppe abschalten</button></div>
+        <div class="chips">
+          {% for x in g.melder %}
+          <button type="button" class="chip" data-melder="{{ x.id }}" data-g="{{ g.nummer }}" data-m="{{ x.nummer }}" title="{{ typen.get(x.typ, x.typ) }}">
+            <b>{{ "%02d"|format(x.nummer) }}</b><i>{{ x.typ|upper }}</i><span>{{ x.ort }}</span></button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>Zustand der Anlage</h2>
+      <ul class="lampen" id="lampen">
+        <li data-l="ue"><i class="led rot"></i>ÜE ausgelöst <small>Leitstelle alarmiert, FSD entriegelt</small></li>
+        <li data-l="akustik"><i class="led rot"></i>Akustische Signale laufen</li>
+        <li data-l="bfs"><i class="led rot"></i>Brandfallsteuerungen ausgelöst</li>
+        <li data-l="loesch"><i class="led rot"></i>Löschanlage ausgelöst</li>
+        <li data-l="ue_ab"><i class="led gelb"></i>ÜE abgeschaltet</li>
+        <li data-l="akustik_ab"><i class="led gelb"></i>Akustische Signale abgeschaltet</li>
+        <li data-l="bfs_ab"><i class="led gelb"></i>Brandfallsteuerungen abgeschaltet</li>
+        <li data-l="summer"><i class="led gelb"></i>Summer an FAT oder BMZ läuft</li>
+      </ul>
+      <div class="actions wrap">
+        <button type="button" class="light" data-aktion="ruecksetzen">BMZ rückstellen</button>
+        {% if o.loeschanlage %}<button type="button" class="light" data-aktion="loeschanlage">Löschanlage auslösen</button>{% endif %}
+        <button type="button" data-aktion="grundstellung" data-frage="Alles zurücksetzen, auch Störungen, Abschaltungen und die Schalter am FBF?">Grundstellung</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Aktive Meldungen <span class="tag" id="anzahl">0</span></h2>
+      <ul class="meldungen" id="meldungen"></ul>
+      <p class="hint" id="keine">Keine Meldungen. Die Anlage ist in Ruhe.</p>
+      <div id="vorgemerkt" hidden><p class="hint"><span id="vorgemerkt-text"></span>
+        <button type="button" class="link" data-aktion="vormerkungen_loeschen">verwerfen</button></p></div>
+      <h3>Störung ohne Melder</h3>
+      <div class="actions wrap">
+        <button type="button" class="light klein" data-stoerung="Netzausfall">Netzausfall</button>
+        <button type="button" class="light klein" data-stoerung="Akku-Störung">Akku</button>
+        <button type="button" class="light klein" data-stoerung="ÜE-Leitung gestört">ÜE-Leitung</button>
+        <button type="button" class="light klein" data-stoerung="Erdschluss">Erdschluss</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Anzeigen für die Übenden</h2>
+      <p class="hint">Diese Adresse auf dem Gerät der Übenden öffnen (Tablet, zweiter Bildschirm). Sie braucht keine Anmeldung.</p>
+      <div class="linkzeile"><img src="/objekte/{{ o.id }}/qr.svg" alt="QR-Code zur Adresse der Anzeigen" width="132" height="132">
+        <div><code id="link">{{ link }}</code>
+          <div class="actions wrap">
+            <a class="btn light klein" href="/a/{{ o.token }}/fat" target="_blank" rel="noopener">FAT und FBF</a>
+            <a class="btn light klein" href="/a/{{ o.token }}/bmz" target="_blank" rel="noopener">BMZ</a>
+            <a class="btn light klein" href="/a/{{ o.token }}/verzeichnis" target="_blank" rel="noopener">Verzeichnis</a>
+          </div>
+          <form method="post" action="/objekte/{{ o.id }}/link-erneuern"><input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="link" data-frage="Neue Adresse vergeben? Geöffnete Anzeigen verlieren die Verbindung.">Adresse erneuern</button></form>
+        </div></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Übungsprotokoll</h2>
+        <div><a class="btn light klein" href="/objekte/{{ o.id }}/protokoll.csv">CSV</a>
+          <form class="inline" method="post" action="/objekte/{{ o.id }}/protokoll/leeren"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Protokoll dieses Objekts leeren?">Leeren</button></form></div></div>
+      <ol class="protokoll" id="protokoll"></ol>
+    </div>
+  </aside>
+</div>
+<script src="/static/frage.js?v=1"></script>
+<script src="/static/leitstand.js?v=1"></script>
+{% endblock %}

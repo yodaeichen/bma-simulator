@@ -1,0 +1,39 @@
+{% extends "anzeige_base.html" %}
+{% block title %}BMZ · {{ o.name }}{% endblock %}
+{% block bodyclass %}seite-bmz{% endblock %}
+{% block content %}
+<main class="wand" id="anzeige" data-token="{{ o.token }}" data-name="{{ o.name }}" data-nr="{{ o.bma_nr }}">
+  <section class="geraet bmz zu" id="bmz" aria-label="Brandmelderzentrale">
+    <h1>Brandmelderzentrale <small>{{ o.bma_nr }}</small></h1>
+    <div class="bmz-innen">
+      <div class="bmz-leds">
+        <div><i class="led gruen an"></i>Betrieb</div>
+        <div class="feuer"><i class="led rot gross" data-led="alarm"></i>FEUER</div>
+        <div><i class="led gelb" data-led="stoerung"></i>Störung</div>
+        <div><i class="led gelb" data-led="abschaltung"></i>Abschaltung</div>
+        <div><i class="led rot" data-led="ue"></i>ÜE ausgelöst</div>
+        <div><i class="led gelb" data-led="ue_ab"></i>ÜE abgeschaltet</div>
+        <div><i class="led gelb" data-led="akustik_ab"></i>Akustik abgeschaltet</div>
+        <div><i class="led gelb" data-led="bfs_ab"></i>Steuerungen abgeschaltet</div>
+        <div><i class="led rot" data-led="loesch"></i>Löschanlage ausgelöst</div>
+      </div>
+      <div class="bmz-mitte">
+        <div class="lcd-rahmen"><pre class="lcd lcd-bmz" id="bmz-lcd" aria-live="polite" aria-label="Anzeige der BMZ"></pre></div>
+        <div class="bmz-reiter">
+          <button type="button" class="taste breit on" data-ebene="alarm">Alarme</button>
+          <button type="button" class="taste breit" data-ebene="stoerung">Störungen</button>
+          <button type="button" class="taste breit" data-ebene="abschaltung">Abschaltungen</button>
+          <button type="button" class="taste" id="bmz-auf" aria-label="Nach oben blättern">▲</button>
+          <button type="button" class="taste" id="bmz-ab" aria-label="Nach unten blättern">▼</button>
+        </div>
+      </div>
+      <div class="bmz-bedien">
+        <button type="button" class="taste breit" data-geraet="bmz" data-aktion="summer_ab">Summer aus</button>
+        <button type="button" class="taste breit gesperrt" data-geraet="bmz" data-aktion="ruecksetzen">Rückstellen</button>
+        <button type="button" class="schloss" id="bmz-schloss" aria-pressed="false"><i></i><span>Bedienung freigeben</span></button>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="/static/anzeige.js?v=1"></script>
+{% endblock %}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block title %}{{ o.name }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/anzeige.css?v=1">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+<div class="leiste">
+  <strong>{{ o.name }}</strong>
+  <nav><a href="/a/{{ o.token }}/fat"{% if self.bodyclass() == 'seite-fat' %} aria-current="page"{% endif %}>FAT und FBF</a>
+    <a href="/a/{{ o.token }}/bmz"{% if self.bodyclass() == 'seite-bmz' %} aria-current="page"{% endif %}>BMZ</a>
+    <a href="/a/{{ o.token }}/verzeichnis"{% if self.bodyclass() == 'seite-verzeichnis' %} aria-current="page"{% endif %}>Meldergruppen</a></nav>
+  {% block leiste %}<button type="button" id="ton" aria-pressed="false">Ton ein</button>{% endblock %}
+</div>
+<div class="offline" id="offline" hidden>Keine Verbindung zur Anlage</div>
+{% block content %}{% endblock %}
+<p class="fuss">Übungsanlage &middot; BMA Simulator {{ version }}</p>
+</body>
+</html>

@@ -1,0 +1,80 @@
+/* Anzeigen für die Übenden: FAT, FBF und BMZ als Geräte an der Wand. */
+:root { --wand:#2a2e33; --gehaeuse:#d7d9da; --gehaeuse-kante:#a9adb0; --schrift:#20252b; --taste:#3b4047; --lcd:#b9c88a; --lcd-schrift:#1d2a12; }
+* { box-sizing:border-box; }
+body { margin:0; font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--wand); color:#e8eaed; min-height:100vh; }
+.leiste { display:flex; align-items:center; gap:8px 18px; flex-wrap:wrap; padding:8px 16px; background:#1b1e22; font-size:14px; }
+.leiste nav { display:flex; gap:14px; flex:1; flex-wrap:wrap; } .leiste a { color:#aeb6c2; text-decoration:none; } .leiste a:hover { color:#fff; }
+.leiste a[aria-current] { color:#fff; border-bottom:2px solid #e0162f; }
+.leiste button { background:none; border:1px solid #5b6470; color:#e8eaed; border-radius:6px; padding:4px 12px; font:inherit; cursor:pointer; }
+.leiste button[aria-pressed=true] { background:#e8eaed; color:#1b1e22; }
+.offline { background:#b42318; color:#fff; text-align:center; padding:8px; font-weight:600; }
+.fuss { text-align:center; color:#7d8693; font-size:12px; margin:18px 0; }
+button:focus-visible, a:focus-visible { outline:3px solid #6cb2ff; outline-offset:2px; }
+
+.wand { display:flex; flex-wrap:wrap; gap:28px; justify-content:center; align-items:flex-start; padding:28px 16px 8px; }
+.geraet { background:linear-gradient(#e2e4e5, var(--gehaeuse)); color:var(--schrift); border:1px solid var(--gehaeuse-kante); border-radius:10px; padding:16px 18px 18px;
+  box-shadow:0 1px 0 #fff inset, 0 14px 30px rgba(0,0,0,.45); }
+.geraet h1 { margin:0 0 12px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; color:#4a5058; }
+.geraet h1 small { font-weight:400; letter-spacing:.4px; margin-left:8px; text-transform:none; }
+
+.led { display:inline-block; width:16px; height:16px; border-radius:50%; flex:none; border:1px solid rgba(0,0,0,.45); box-shadow:0 1px 1px rgba(255,255,255,.6); }
+.led.rot { background:#5a1b20; } .led.gelb { background:#5d4d14; } .led.gruen { background:#1d4a26; }
+.led.rot.an { background:#ff2b3d; box-shadow:0 0 10px 2px rgba(255,43,61,.75); }
+.led.gelb.an { background:#ffc800; box-shadow:0 0 10px 2px rgba(255,200,0,.7); }
+.led.gruen.an { background:#2fd45a; box-shadow:0 0 8px 1px rgba(47,212,90,.65); }
+.led.gross { width:26px; height:26px; }
+@media (prefers-reduced-motion:no-preference){ .led.rot.blinkt.an { animation:blink 1s steps(1) infinite; } }
+@keyframes blink { 50% { background:#5a1b20; box-shadow:0 1px 1px rgba(255,255,255,.6); } }
+
+.taste { background:linear-gradient(#4a5058, var(--taste)); color:#f1f3f5; border:1px solid #1d2024; border-bottom-width:3px; border-radius:6px; min-width:46px; min-height:42px;
+  font:600 14px/1.1 system-ui,sans-serif; cursor:pointer; padding:6px 10px; }
+.taste:active { border-bottom-width:1px; transform:translateY(2px); } .taste.breit { padding:6px 16px; }
+.taste.on { background:#1d2024; box-shadow:0 0 0 2px #ffc800 inset; }
+.taste:disabled { opacity:.45; cursor:not-allowed; }
+
+.lcd-rahmen { background:#16181b; border-radius:6px; padding:10px; box-shadow:0 2px 6px rgba(0,0,0,.6) inset; }
+.lcd { margin:0; background:var(--lcd); color:var(--lcd-schrift); font-family:"DejaVu Sans Mono","Cascadia Mono",Consolas,"Liberation Mono",Menlo,monospace; font-weight:700;
+  white-space:pre; overflow:hidden; border-radius:2px; box-shadow:0 0 14px rgba(0,0,0,.35) inset; }
+.lcd-fat { font-size:clamp(15px, 4.1vw, 27px); line-height:1.45; padding:8px 12px; letter-spacing:.06em; width:calc(20ch + 20 * .06em + 24px); height:calc(4 * 1.45em + 16px); }
+.lcd-bmz { font-size:clamp(11px, 2.1vw, 17px); line-height:1.5; padding:10px 14px; width:calc(48ch + 28px); height:calc(11 * 1.5em + 20px); max-width:100%; }
+
+/* FAT (angelehnt an DIN 14662) */
+.fat-innen { display:flex; gap:14px; align-items:stretch; }
+.fat-leds { display:flex; flex-direction:column; justify-content:space-between; gap:8px; font-size:13px; font-weight:600; min-width:108px; }
+.fat-leds div { display:flex; align-items:center; gap:8px; }
+.fat-tasten { display:flex; flex-direction:column; justify-content:space-between; align-items:center; gap:6px; }
+.weitere { font-size:10.5px; line-height:1.15; text-align:center; color:#4a5058; display:flex; flex-direction:column; align-items:center; gap:3px; }
+.weitere .led { width:11px; height:11px; }
+.fat-unten { display:flex; align-items:center; gap:12px; margin-top:14px; } .fat-unten .ebene { flex:1; font-size:13px; color:#4a5058; }
+@media (max-width:640px){ .fat-innen { flex-wrap:wrap; } .fat-leds { flex-direction:row; flex-wrap:wrap; width:100%; } .fat-tasten { flex-direction:row; width:100%; justify-content:center; } }
+
+/* FBF (angelehnt an DIN 14661) */
+.fbf { width:330px; max-width:100%; }
+.fbf-feld { display:flex; flex-direction:column; gap:9px; }
+.fbf-feld .z { display:grid; grid-template-columns:20px 1fr 50px; gap:12px; align-items:center; min-height:44px; }
+.schild { background:#f4f5f5; border:1px solid #9a9fa5; border-radius:3px; padding:9px 10px; font-weight:700; font-size:14px; line-height:1.15; }
+.schild.rot { background:#d9202f; border-color:#8f0b20; color:#fff; } .schild.gelb { background:#ffd21f; border-color:#a67c00; color:#1d1a05; }
+.fbf.zu .fbf-feld .taste { opacity:.5; }
+.schloss { display:flex; align-items:center; gap:10px; margin-top:16px; width:100%; background:none; border:1px dashed #7a8087; border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; color:#3b4047; cursor:pointer; text-align:left; }
+.schloss i { width:30px; height:30px; border-radius:50%; flex:none; background:radial-gradient(circle at 35% 30%, #f3f3f1, #8d9296); border:2px solid #5d6268; position:relative; }
+.schloss i::after { content:""; position:absolute; left:50%; top:50%; width:4px; height:14px; background:#22262b; border-radius:2px; transform:translate(-50%,-50%); transition:transform .15s; }
+.schloss[aria-pressed=true] { border-style:solid; border-color:#1a7f4b; } .schloss[aria-pressed=true] i::after { transform:translate(-50%,-50%) rotate(90deg); }
+
+/* BMZ */
+.bmz { max-width:100%; }
+.bmz-innen { display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+.bmz-leds { display:flex; flex-direction:column; gap:9px; font-size:13px; font-weight:600; min-width:200px; }
+.bmz-leds div { display:flex; align-items:center; gap:9px; } .bmz-leds .feuer { font-size:18px; letter-spacing:1.5px; color:#8f0b20; margin:2px 0; }
+.bmz-mitte { min-width:0; } .bmz-reiter { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.bmz-bedien { display:flex; flex-direction:column; gap:10px; min-width:170px; } .bmz.zu .taste.gesperrt { opacity:.5; }
+@media (max-width:900px){ .bmz-leds { flex-direction:row; flex-wrap:wrap; gap:8px 16px; } .bmz-bedien { flex-direction:row; flex-wrap:wrap; } }
+
+/* Auswahl und Verzeichnis */
+.wahl, .verzeichnis { max-width:760px; margin:0 auto; padding:28px 18px; } .wahl h1, .verzeichnis h1 { margin:0 0 4px; font-size:24px; } .wahl p, .verzeichnis p { color:#aeb6c2; margin:0 0 20px; }
+.kachel { display:block; background:#353a41; border:1px solid #4a515a; border-radius:10px; padding:16px 18px; margin-bottom:12px; color:#fff; text-decoration:none; }
+.kachel:hover { border-color:#aeb6c2; } .kachel strong { display:block; font-size:18px; } .kachel span { color:#aeb6c2; font-size:14px; }
+.verzeichnis h2 { font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:#aeb6c2; margin:24px 0 6px; }
+.verzeichnis table { width:100%; border-collapse:collapse; background:#f4f5f5; color:#20252b; border-radius:6px; overflow:hidden; }
+.verzeichnis th, .verzeichnis td { text-align:left; padding:7px 10px; border-bottom:1px solid #d0d3d6; } .verzeichnis th { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#5d6268; }
+.verzeichnis td:first-child { font-variant-numeric:tabular-nums; white-space:nowrap; width:130px; } .verzeichnis tr.gruppe td { background:#dfe2e4; font-weight:700; }
+@media print { body { background:#fff; color:#000; } .leiste, .fuss { display:none; } .verzeichnis p, .verzeichnis h2 { color:#000; } }

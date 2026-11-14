@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row"><h1>Objekte</h1><a class="btn" href="/objekte/neu">Neues Objekt</a></div>
+{% if not karten %}
+<div class="card"><p>Noch kein Objekt angelegt. Ein Objekt ist ein Gebäude mit eigener Brandmeldeanlage: Etagen, Meldergruppen und Melder.</p>
+<a class="btn" href="/objekte/neu">Erstes Objekt anlegen</a></div>
+{% endif %}
+<div class="tiles objekte">
+{% for k in karten %}
+  <div class="tile{% if k.sicht.alarme %} alarm{% endif %}">
+    <strong>{{ k.o.name }}</strong>
+    <span>{{ k.o.adresse or "ohne Adresse" }}</span>
+    <span>{{ k.etagen }} Etagen &middot; {{ k.o.gruppen|length }} Gruppen &middot; {{ k.melder }} Melder</span>
+    <p>
+      {% if k.sicht.alarme %}<span class="tag fehler">{{ k.sicht.alarme }} Alarm{{ "e" if k.sicht.alarme != 1 }}</span>
+      {% elif k.sicht.normal %}<span class="tag gesendet">Ruhe</span>
+      {% else %}<span class="tag test">nicht in Grundstellung</span>{% endif %}
+    </p>
+    <div class="actions">
+      <a class="btn" href="/objekte/{{ k.o.id }}">Übung öffnen</a>
+      <a class="btn light" href="/objekte/{{ k.o.id }}/melder">Melderliste</a>
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

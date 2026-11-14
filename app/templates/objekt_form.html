@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ "Objekt bearbeiten" if o else "Neues Objekt" }}</h1>
+<div class="card">
+<form method="post" action="/objekte/speichern">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ o.id if o else '' }}">
+  <div class="grid">
+    <div><label for="name">Name</label><input type="text" id="name" name="name" value="{{ o.name if o else '' }}" maxlength="120" required>
+      <p class="hint">So heißt das Objekt in der Übersicht und auf den Anzeigen.</p></div>
+    <div><label for="bma_nr">BMA-Nummer</label><input type="text" id="bma_nr" name="bma_nr" value="{{ o.bma_nr if o else '' }}" maxlength="40">
+      <p class="hint">Freiwillig, z. B. die Nummer der Anlage bei der Leitstelle.</p></div>
+  </div>
+  <label for="adresse">Adresse</label><input type="text" id="adresse" name="adresse" value="{{ o.adresse if o else '' }}" maxlength="200">
+  <label for="hinweis">Hinweise für den Ausbilder</label><textarea id="hinweis" name="hinweis" maxlength="2000">{{ o.hinweis if o else '' }}</textarea>
+  <p class="hint">Nur in der Ausbilderansicht sichtbar, z. B. Lage der FIZ oder Besonderheiten der Übung.</p>
+  <label class="check"><input type="checkbox" name="loeschanlage" {{ 'checked' if o and o.loeschanlage }}> Das Objekt hat eine Löschanlage (Sprinkler, Gaslöschanlage)</label>
+  <div class="actions"><button>Speichern</button><a class="btn light" href="{{ '/objekte/%d' % o.id if o else '/' }}">Abbrechen</a></div>
+</form>
+</div>
+{% if o %}
+<div class="card">
+  <h2>Weitere Schritte</h2>
+  <div class="actions">
+    <a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste bearbeiten</a>
+    <form method="post" action="/objekte/{{ o.id }}/kopieren"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="light">Objekt kopieren</button></form>
+    <form method="post" action="/objekte/{{ o.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Objekt „{{ o.name }}“ mit allen Meldern und dem Protokoll löschen?">Objekt löschen</button></form>
+  </div>
+</div>
+<script src="/static/frage.js?v=1"></script>
+{% endif %}
+{% endblock %}

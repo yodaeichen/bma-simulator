@@ -1,0 +1,46 @@
+{% extends "anzeige_base.html" %}
+{% block title %}FAT · {{ o.name }}{% endblock %}
+{% block bodyclass %}seite-fat{% endblock %}
+{% block content %}
+<main class="wand" id="anzeige" data-token="{{ o.token }}" data-name="{{ o.name }}" data-nr="{{ o.bma_nr }}">
+
+  <section class="geraet fat" aria-label="Feuerwehr-Anzeigetableau">
+    <h1>Feuerwehr-Anzeigetableau</h1>
+    <div class="fat-innen">
+      <div class="fat-leds">
+        <div><i class="led gruen an"></i>Betrieb</div>
+        <div><i class="led rot" data-led="alarm"></i>Alarm</div>
+        <div><i class="led gelb" data-led="stoerung"></i>Störung</div>
+        <div><i class="led gelb" data-led="abschaltung"></i>Abschaltung</div>
+      </div>
+      <div class="lcd-rahmen"><pre class="lcd lcd-fat" id="fat-lcd" aria-live="polite" aria-label="Anzeige des FAT"></pre></div>
+      <div class="fat-tasten">
+        <button type="button" class="taste" id="fat-auf" aria-label="Vorherige Meldung">▲</button>
+        <div class="weitere"><i class="led gelb" data-led="weitere"></i>weitere<br>Meldungen</div>
+        <button type="button" class="taste" id="fat-ab" aria-label="Nächste Meldung">▼</button>
+      </div>
+    </div>
+    <div class="fat-unten">
+      <button type="button" class="taste breit" id="fat-ebene">Anzeigeebene</button>
+      <span class="ebene" id="fat-ebene-name">Alarm</span>
+      <button type="button" class="taste breit" data-geraet="fat" data-aktion="summer_ab">Summer ab</button>
+    </div>
+  </section>
+
+  <section class="geraet fbf zu" id="fbf" aria-label="Feuerwehr-Bedienfeld">
+    <h1>Feuerwehr-Bedienfeld</h1>
+    <div class="fbf-feld">
+      <div class="z"><i class="led gruen an"></i><span class="schild">Betrieb</span><span></span></div>
+      <div class="z"><i class="led rot" data-led="ue"></i><span class="schild rot">ÜE ausgelöst</span><span></span></div>
+      <div class="z"><i class="led rot" data-led="loesch"></i><span class="schild rot">Löschanlage ausgelöst</span><span></span></div>
+      <div class="z"><i class="led gelb" data-led="bfs_ab"></i><span class="schild gelb">Brandfall-Steuerungen ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="bfs_ab" aria-label="Brandfall-Steuerungen ab"></button></div>
+      <div class="z"><i class="led gelb" data-led="akustik_ab"></i><span class="schild gelb">Akustische Signale ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="akustik_ab" aria-label="Akustische Signale ab"></button></div>
+      <div class="z"><i class="led gelb" data-led="ue_ab"></i><span class="schild gelb">ÜE ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ue_ab" aria-label="ÜE ab"></button></div>
+      <div class="z"><i></i><span class="schild">ÜE prüfen</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ue_pruefen" aria-label="ÜE prüfen"></button></div>
+      <div class="z"><i></i><span class="schild">BMZ rückstellen</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ruecksetzen" aria-label="BMZ rückstellen"></button></div>
+    </div>
+    <button type="button" class="schloss" id="fbf-schloss" aria-pressed="false"><i></i><span>Mit Feuerwehrschlüssel aufschließen</span></button>
+  </section>
+</main>
+<script src="/static/anzeige.js?v=1"></script>
+{% endblock %}

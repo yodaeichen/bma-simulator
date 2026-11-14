@@ -1,0 +1,100 @@
+"""Datenmodell (SQLite über SQLAlchemy)."""
+import datetime as dt
+import os
+import secrets
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
+
+DATA_DIR = os.environ.get("DATA_DIR", "/data")
+os.makedirs(DATA_DIR, exist_ok=True)
+engine = create_engine(f"sqlite:///{DATA_DIR}/simulator.db", connect_args={"check_same_thread": False, "timeout": 30})
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_pragmas(conn, _):
+    cur = conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")
+    cur.execute("PRAGMA foreign_keys=ON")
+    cur.close()
+
+
+SessionLocal = sessionmaker(engine, expire_on_commit=False)
+
+
+def utcnow() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+
+
+def new_token() -> str:
+    return secrets.token_urlsafe(12)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(80), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(200))
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    last_login: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Objekt(Base):
+    """Ein Übungsobjekt mit eigener Brandmeldeanlage."""
+    __tablename__ = "objekte"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    adresse: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    bma_nr: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    hinweis: Mapped[str] = mapped_column(Text, default="", server_default="")
+    loeschanlage: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    # Geheimer Teil der Adresse, unter der die Anzeigen (FAT, FBF, BMZ) ohne Anmeldung erreichbar sind
+    token: Mapped[str] = mapped_column(String(40), unique=True, default=new_token)
+    # Laufender Zustand der Anlage als JSON (siehe sim.py)
+    state: Mapped[str] = mapped_column(Text, default="", server_default="")
+    gruppen: Mapped[list["Gruppe"]] = relationship(back_populates="objekt", cascade="all, delete-orphan",
+                                                    order_by="Gruppe.nummer")
+    protokoll: Mapped[list["Protokoll"]] = relationship(cascade="all, delete-orphan")
+
+
+class Gruppe(Base):
+    """Meldergruppe: gehört zu einem Objekt und liegt in einer Etage bzw. einem Bereich."""
+    __tablename__ = "gruppen"
+    __table_args__ = (UniqueConstraint("objekt_id", "nummer"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objekt_id: Mapped[int] = mapped_column(ForeignKey("objekte.id", ondelete="CASCADE"))
+    nummer: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(80), default="")
+    etage: Mapped[str] = mapped_column(String(40), default="")
+    objekt: Mapped[Objekt] = relationship(back_populates="gruppen")
+    melder: Mapped[list["Melder"]] = relationship(back_populates="gruppe", cascade="all, delete-orphan",
+                                                   order_by="Melder.nummer")
+
+
+class Melder(Base):
+    __tablename__ = "melder"
+    __table_args__ = (UniqueConstraint("gruppe_id", "nummer"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    gruppe_id: Mapped[int] = mapped_column(ForeignKey("gruppen.id", ondelete="CASCADE"))
+    nummer: Mapped[int] = mapped_column(Integer)
+    typ: Mapped[str] = mapped_column(String(10), default="rm")
+    ort: Mapped[str] = mapped_column(String(80), default="")
+    gruppe: Mapped[Gruppe] = relationship(back_populates="melder")
+
+
+class Protokoll(Base):
+    """Übungsprotokoll: wer hat wann was ausgelöst oder bedient."""
+    __tablename__ = "protokoll"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objekt_id: Mapped[int] = mapped_column(ForeignKey("objekte.id", ondelete="CASCADE"), index=True)
+    ts: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+    quelle: Mapped[str] = mapped_column(String(40), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+
+
+def init_db():
+    Base.metadata.create_all(engine)
