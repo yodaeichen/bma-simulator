@@ -1,0 +1,57 @@
+/* Feuerwehr-Laufkarten: am Bildschirm (Tablet, Beamer) und im Druck (A4 quer, je Seite der Karte ein Blatt). */
+.lk { --rot:#c8102e; --weg:#0a8a3c; color:#16191d; font:14px/1.35 Arial, Helvetica, sans-serif; }
+.lk-seite { background:#fff; border:2px solid var(--rot); border-radius:4px; margin:0 auto 18px; max-width:1180px; display:flex; flex-direction:column; overflow:hidden; }
+.lk-kopf { display:flex; align-items:stretch; background:var(--rot); color:#fff; }
+.lk-titel { padding:8px 14px; font-size:20px; font-weight:700; letter-spacing:.3px; min-width:250px; }
+.lk-titel small { display:block; font-size:12px; font-weight:400; letter-spacing:.4px; opacity:.95; }
+.lk-objekt { flex:1; padding:8px 14px; border-left:2px solid #fff; } .lk-objekt b { display:block; font-size:17px; } .lk-objekt span { font-size:13px; }
+.lk-nummer { background:#fff; color:#16191d; margin:4px; border-radius:2px; padding:2px 16px; text-align:center; min-width:150px; }
+.lk-nummer small { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.6px; } .lk-nummer b { font-size:34px; line-height:1; font-variant-numeric:tabular-nums; }
+.lk-daten { display:grid; grid-template-columns:1fr 2fr 2fr 1fr; margin:0; border-bottom:2px solid var(--rot); }
+.lk-daten div { padding:5px 14px; border-right:1px solid #d9b3ba; } .lk-daten div:last-child { border-right:0; }
+.lk-daten dt { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#5b6470; } .lk-daten dd { margin:0; font-weight:700; font-size:15px; }
+.lk-koerper { display:flex; align-items:stretch; }
+.lk-plan { flex:1; min-width:0; padding:10px; display:flex; align-items:center; justify-content:center; background:#fafafa; }
+.lk-rand { width:270px; flex:none; border-left:2px solid var(--rot); padding:10px 12px; font-size:13.5px; }
+.lk-rand h3 { margin:0 0 5px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--rot); } .lk-rand h3:not(:first-child) { margin-top:14px; }
+.lk-rand ol { margin:0; padding-left:20px; } .lk-rand li { margin-bottom:4px; } .lk-rand p { margin:0; } .lk-rand .leer { color:#5b6470; }
+.lk-rand .warn { background:#fff3c4; border:1px solid #d9a441; border-radius:3px; padding:6px 8px; font-weight:700; white-space:pre-line; }
+.lk-rand table { border-collapse:collapse; width:100%; } .lk-rand td { padding:3px 0; vertical-align:top; border-bottom:1px solid #e3e5e8; }
+.lk-rand td:first-child { font-weight:700; font-variant-numeric:tabular-nums; padding-right:10px; white-space:nowrap; } .lk-rand td span { color:#5b6470; }
+.legende { list-style:none; margin:0; padding:0; } .legende li { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.legende .m { position:static; transform:none; flex:none; } .legende .linie { width:28px; height:0; border-top:4px solid var(--weg); flex:none; }
+
+/* Plan mit Zeichenebene: Lagen sind Anteile von Breite und Höhe des Bildes */
+.plan { position:relative; display:inline-block; line-height:0; max-width:100%; }
+.plan img { display:block; max-width:100%; max-height:62vh; border:1px solid #9aa1a9; background:#fff; }
+.plan svg, .plan .ebene { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.plan polyline { fill:none; stroke:#0a8a3c; stroke-width:5; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+.m { position:absolute; transform:translate(-50%,-50%); display:inline-flex; align-items:center; justify-content:center; font:700 12px/1 Arial, Helvetica, sans-serif; font-style:normal; box-sizing:border-box; }
+.m.fiz { background:#0a8a3c; color:#fff; padding:4px 6px; border:2px solid #fff; border-radius:3px; box-shadow:0 0 0 1px #0a8a3c; }
+.m.start, .m.punkt { width:12px; height:12px; border-radius:50%; background:#0a8a3c; border:2px solid #fff; }
+.m.ziel { width:20px; height:20px; border-radius:50%; background:#fff; border:5px solid #0a8a3c; }
+.m.melder { width:24px; height:24px; border-radius:50%; background:#c8102e; color:#fff; border:2px solid #fff; box-shadow:0 0 0 1px #8f0b20; }
+.m.melder.hfm { border-radius:3px; }
+.schema { position:absolute; right:6px; top:6px; background:rgba(255,255,255,.9); border:1px solid #9aa1a9; font:11px/1.2 Arial, sans-serif; padding:2px 6px; color:#5b6470; }
+.plan-leer { line-height:1.4; border:2px dashed #9aa1a9; border-radius:6px; padding:40px 24px; color:#5b6470; text-align:center; width:100%; }
+
+/* Bearbeiten */
+.edit-plaene { display:grid; grid-template-columns:repeat(auto-fit, minmax(480px, 1fr)); gap:0 20px; }
+.plan.edit { cursor:not-allowed; opacity:.75; } .plan.edit.aktiv { cursor:crosshair; opacity:1; outline:3px solid #0b5cad; outline-offset:2px; }
+.plan.edit img { max-height:none; width:100%; } .m.punkt.aktiv { background:#fff; border-color:#0a8a3c; } .m.melder.gewaehlt { box-shadow:0 0 0 4px #ffc800; }
+.werkzeuge select { width:auto; display:inline-block; margin-left:6px; padding:3px 6px; color:#1c2430; }
+
+/* Seite mit allen Karten */
+body.druck { margin:0; background:#e9eaec; padding:0 12px 20px; }
+.werkzeug { display:flex; gap:10px 18px; align-items:center; flex-wrap:wrap; max-width:1180px; margin:0 auto; padding:12px 0; font:14px/1.4 system-ui, sans-serif; color:#1c2430; }
+.werkzeug span { flex:1; color:#5b6470; min-width:240px; } .werkzeug button { background:#c8102e; color:#fff; border:0; border-radius:6px; padding:8px 16px; font:inherit; cursor:pointer; }
+
+@media screen and (max-width:820px) { .lk-koerper { flex-direction:column; } .lk-rand { width:auto; border-left:0; border-top:2px solid var(--rot); } .lk-kopf { flex-wrap:wrap; } .lk-daten { grid-template-columns:1fr 1fr; } }
+@media print {
+  @page { size:A4 landscape; margin:8mm; }
+  body, body.druck { background:#fff !important; padding:0; margin:0; }
+  .werkzeug, .leiste, .fuss, .blaettern, .offline, body > header, body > footer { display:none !important; }
+  .lk-seite { max-width:none; height:192mm; margin:0; break-after:page; break-inside:avoid; border-radius:0; }
+  .lk-koerper { flex:1; min-height:0; } .lk-plan { background:#fff; } .plan img { max-height:142mm; }
+  .lk, .lk * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}

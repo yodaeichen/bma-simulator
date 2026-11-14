@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Laufkarte {{ nr(k.g.nummer) }} · {{ o.name }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/laufkarte.css?v=2">{% endblock %}
+{% block mainattr %} class="breit"{% endblock %}
+{% block content %}
+<div class="row"><h1>Laufkarte {{ nr(k.g.nummer) }} <span class="tag">{{ k.g.etage }}</span> {{ k.g.name }}</h1>
+  <div>{% if davor %}<a class="btn light klein" href="/gruppen/{{ davor }}/laufkarte">◀ vorige</a>{% endif %}
+    {% if danach %}<a class="btn light klein" href="/gruppen/{{ danach }}/laufkarte">nächste ▶</a>{% endif %}
+    <a class="btn light" href="/objekte/{{ o.id }}/laufkarten/druck?gruppe={{ k.g.nummer }}" target="_blank" rel="noopener">Ansehen</a>
+    <a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Alle Laufkarten</a></div></div>
+
+<form method="post" action="/gruppen/{{ k.g.id }}/laufkarte" id="lk-edit" data-daten='{{ daten|tojson }}'>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="fiz"><input type="hidden" name="weg1"><input type="hidden" name="weg2"><input type="hidden" name="melder">
+  <div class="card">
+    <fieldset class="modus werkzeuge">
+      <legend>Ein Klick in den Plan …</legend>
+      <label><input type="radio" name="werkzeug" value="weg1" checked> zeichnet den Laufweg {{ 'weiter' if k.gleich else 'der Vorderseite weiter' }}</label>
+      <label><input type="radio" name="werkzeug" value="fiz"> setzt den Standort der FIZ</label>
+      {% if not k.gleich %}<label><input type="radio" name="werkzeug" value="weg2"> zeichnet den Laufweg der Rückseite weiter</label>{% endif %}
+      <label><input type="radio" name="werkzeug" value="melder"> setzt den Melder
+        <select id="melder-wahl" aria-label="Melder">{% for x in k.g.melder %}<option value="{{ x.id }}">{{ "%02d"|format(x.nummer) }} {{ x.ort }}</option>{% endfor %}</select></label>
+    </fieldset>
+    <div class="actions wrap">
+      <button type="button" class="light klein" id="zurueck">Letzten Punkt entfernen</button>
+      <button type="button" class="light klein" id="leeren">Gewählten Laufweg löschen</button>
+      <button type="button" class="light klein" id="melder-weg">Gewählten Melder vom Plan nehmen</button>
+    </div>
+    <p class="hint">Der Standort der FIZ gilt für alle Laufkarten dieses Objekts. Gespeichert wird erst mit „Speichern“ unten.</p>
+  </div>
+
+  <div class="edit-plaene">
+    <div class="card">
+      <h2>{{ 'Plan ' ~ k.fiz_etage if k.gleich else 'Vorderseite: ' ~ k.fiz_etage ~ ' (Etage der FIZ)' }}</h2>
+      {% if k.plan1 %}<div class="plan edit" data-seite="1"><img src="{{ planpfad }}{{ k.plan1.id }}" alt="Plan {{ k.fiz_etage }}"><div class="ebene"></div></div>
+      {% else %}<div class="plan-leer">Für „{{ k.fiz_etage }}“ ist kein Plan hinterlegt. <a href="/objekte/{{ o.id }}/laufkarten">Plan hochladen oder Schemaplan erzeugen</a></div>{% endif %}
+    </div>
+    {% if not k.gleich %}
+    <div class="card">
+      <h2>Rückseite: {{ k.g.etage or 'Ohne Etage' }}</h2>
+      {% if k.plan2 %}<div class="plan edit" data-seite="2"><img src="{{ planpfad }}{{ k.plan2.id }}" alt="Plan {{ k.g.etage }}"><div class="ebene"></div></div>
+      {% else %}<div class="plan-leer">Für „{{ k.g.etage }}“ ist kein Plan hinterlegt. <a href="/objekte/{{ o.id }}/laufkarten">Plan hochladen oder Schemaplan erzeugen</a></div>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div><label for="laufweg">Laufweg in Worten</label><textarea id="laufweg" name="laufweg" rows="5" maxlength="1500">{{ k.g.laufweg }}</textarea>
+        <p class="hint">Je Zeile ein Schritt, zum Beispiel „Durch das Foyer zum Treppenraum Nord“.</p></div>
+      <div><label for="hinweis">Besonderheiten</label><textarea id="hinweis" name="hinweis" rows="5" maxlength="1000">{{ k.g.hinweis }}</textarea>
+        <p class="hint">Gefahren und Hinweise, zum Beispiel „Zwischendecke: Leiter erforderlich“ oder „Löschanlage im Raum“.</p></div>
+    </div>
+    <div class="actions"><button>Speichern</button><a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Abbrechen</a></div>
+  </div>
+</form>
+<script src="/static/laufkarte_edit.js?v=1"></script>
+{% endblock %}

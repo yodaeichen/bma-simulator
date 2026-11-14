@@ -1,0 +1,15 @@
+{% extends "anzeige_base.html" %}
+{% block title %}Laufkarten · {{ o.name }}{% endblock %}
+{% block bodyclass %}seite-laufkarten{% endblock %}
+{% block leiste %}{% endblock %}
+{% block content %}
+<main class="verzeichnis" id="da" data-token="{{ o.token }}" data-geraet="lauf" data-info="Übersicht der Laufkarten">
+  <h1>Laufkarten</h1>
+  <p>{{ o.name }}{% if o.adresse %}, {{ o.adresse }}{% endif %}. Die Karte zur Meldergruppe wählen, die das FAT anzeigt.</p>
+  <div class="depot">
+    {% for g in o.gruppen %}<a href="/a/{{ o.token }}/laufkarte/{{ g.nummer }}"><b>{{ nr(g.nummer) }}</b><span>{{ g.etage }}</span></a>{% else %}<p>Noch keine Meldergruppen angelegt.</p>{% endfor %}
+  </div>
+  {% if o.gruppen %}<p><a class="alle" href="/a/{{ o.token }}/laufkarten/alle">Alle Laufkarten zum Drucken</a></p>{% endif %}
+</main>
+<script src="/static/praesenz.js?v=2"></script>
+{% endblock %}

@@ -156,6 +156,7 @@
         marken.appendChild(el("span", "tag" + (g.ton ? "" : " test"), g.ton ? "Ton an" : "Ton aus"));
         k.appendChild(marken);
       }
+      if (g.info) k.appendChild(el("div", "letzte", g.info));
       if (g.taste) k.appendChild(el("div", "letzte", "Zuletzt gedrückt: " + g.taste + " (" + uhr(g.taste_zeit) + ")"));
       kasten.appendChild(k);
     });

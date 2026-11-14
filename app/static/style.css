@@ -53,8 +53,8 @@ h3.etage { margin-top:22px; } table.melderliste tr.gruppe td { background:#f7f8f
 /* Ausbilderansicht */
 .leitstand { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:20px; align-items:start; }
 @media (max-width:1050px){ .leitstand{ grid-template-columns:1fr; } }
-.werkzeug fieldset { border:0; padding:0; margin:0 0 10px; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
-.werkzeug legend { font-weight:600; padding:0; margin-bottom:6px; }
+fieldset.modus { border:0; padding:0; margin:0 0 10px; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
+fieldset.modus legend { font-weight:600; padding:0; margin-bottom:6px; }
 .modus label { font-weight:400; margin:0; border:1px solid var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; background:#eef0f4; }
 .modus label:has(input:checked) { background:var(--ink); color:#fff; border-color:var(--ink); } .modus input { position:absolute; opacity:0; }
 .modus label:has(input:focus-visible) { outline:3px solid #0b5cad; outline-offset:2px; }

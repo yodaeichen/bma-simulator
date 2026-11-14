@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import db as m
-from . import access, backup, katalog, live, sim
+from . import access, backup, katalog, laufkarte, live, sim
 from . import security as sec
 from .version import VERSION
 
@@ -53,6 +53,9 @@ async def lifespan(_app):
             log.info("Erster Benutzer wurde angelegt.")
             if os.environ.get("BEISPIELE", "true").lower() == "true":
                 log.info("%s Beispielobjekte angelegt.", katalog.beispiele_anlegen(db))
+                for objekt in db.scalars(select(m.Objekt)).all():
+                    laufkarte.schema_erzeugen(db, objekt)
+                db.commit()
     log.info("BMA Simulator %s gestartet.", VERSION)
     task = asyncio.create_task(sicherung_schleife())
     yield
@@ -87,7 +90,7 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "same-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+    response.headers.setdefault("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
     return response
 
 
@@ -385,10 +388,13 @@ async def objekt_loeschen(oid: int, request: Request, user: m.User = Depends(all
 async def objekt_kopieren(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
     await read_form(request)
     o = objekt_for(db, user, oid)
-    neu = m.Objekt(name=(o.name + " (Kopie)")[:120], adresse=o.adresse, bma_nr=o.bma_nr, hinweis=o.hinweis, loeschanlage=o.loeschanlage)
+    neu = m.Objekt(name=(o.name + " (Kopie)")[:120], adresse=o.adresse, bma_nr=o.bma_nr, hinweis=o.hinweis, loeschanlage=o.loeschanlage,
+                   fiz_etage=o.fiz_etage, fiz_x=o.fiz_x, fiz_y=o.fiz_y)
     for g in o.gruppen:
-        neu.gruppen.append(m.Gruppe(nummer=g.nummer, name=g.name, etage=g.etage,
-                                    melder=[m.Melder(nummer=x.nummer, typ=x.typ, ort=x.ort) for x in g.melder]))
+        neu.gruppen.append(m.Gruppe(nummer=g.nummer, name=g.name, etage=g.etage, laufweg=g.laufweg, hinweis=g.hinweis, weg1=g.weg1, weg2=g.weg2,
+                                    melder=[m.Melder(nummer=x.nummer, typ=x.typ, ort=x.ort, px=x.px, py=x.py) for x in g.melder]))
+    for plan in o.plaene:
+        neu.plaene.append(m.Plan(etage=plan.etage, mime=plan.mime, daten=plan.daten, schema=plan.schema))
     db.add(neu)
     db.flush()
     freigeben(user, neu)
@@ -628,6 +634,144 @@ async def protokoll_leeren(oid: int, request: Request, user: m.User = Depends(al
     return go(f"/objekte/{oid}")
 
 
+# ---------- Laufkarten ----------
+
+def plan_antwort(plan: m.Plan) -> Response:
+    """Liefert ein Planbild. Hochgeladene SVG-Dateien dürfen nichts nachladen und nichts ausführen."""
+    return Response(plan.daten, media_type=plan.mime, headers={
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox", "Cache-Control": "private, max-age=60",
+        "Content-Disposition": "inline"})
+
+
+@app.get("/objekte/{oid}/laufkarten")
+def laufkarten(oid: int, request: Request, user: m.User = Depends(allow("objekte:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
+    return page(request, "laufkarten.html", user, o=o, etagen=katalog.etagen(o), stand=laufkarte.stand(o),
+                fiz_etage=laufkarte.fiz_etage(o), plaene={pl.etage: pl for pl in o.plaene})
+
+
+@app.post("/objekte/{oid}/laufkarten/fiz")
+async def laufkarten_fiz(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    form = await read_form(request)
+    o = objekt_for(db, user, oid)
+    etage = text(form, "fiz_etage", 40)
+    if etage in katalog.etagen(o) and etage != laufkarte.fiz_etage(o):
+        o.fiz_etage, o.fiz_x, o.fiz_y = etage, None, None
+        db.commit()
+        flash(request, "Etage der FIZ geändert. Standort und Laufwege der Vorderseiten bitte prüfen oder die Schemapläne neu erzeugen.")
+    return go(f"/objekte/{oid}/laufkarten")
+
+
+@app.post("/objekte/{oid}/plan")
+async def plan_hochladen(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    form = await read_form(request)
+    o = objekt_for(db, user, oid)
+    etage, datei = text(form, "etage", 40), form.get("datei")
+    if etage not in katalog.etagen(o) or datei is None or not getattr(datei, "filename", ""):
+        flash(request, "Bitte eine Etage und eine Bilddatei wählen.", "err")
+        return go(f"/objekte/{oid}/laufkarten")
+    daten = await datei.read(laufkarte.MAX_PLAN + 1)
+    art = laufkarte.bildart(daten)
+    if len(daten) > laufkarte.MAX_PLAN or not art:
+        flash(request, "Der Plan muss ein Bild sein (PNG, JPG, WebP oder SVG) und darf höchstens 4 MB haben. Einen PDF-Plan vorher als Bild speichern.", "err")
+        return go(f"/objekte/{oid}/laufkarten")
+    plan = laufkarte.plan_von(o, etage)
+    war_schema = plan is not None and plan.schema
+    if plan is None:
+        plan = m.Plan(etage=etage)
+        o.plaene.append(plan)
+    plan.mime, plan.daten, plan.schema = art, daten, False
+    if war_schema:  # die Lagen aus dem Schemaplan passen nicht zum neuen Bild
+        for g in o.gruppen:
+            if g.etage == etage:
+                g.weg2 = ""
+                for x in g.melder:
+                    x.px = x.py = None
+            if etage == laufkarte.fiz_etage(o):
+                g.weg1 = ""
+        if etage == laufkarte.fiz_etage(o):
+            o.fiz_x = o.fiz_y = None
+    db.commit()
+    flash(request, f"Plan für „{etage or 'Ohne Etage'}“ gespeichert." + (" Laufwege und Melder dieser Etage bitte neu einzeichnen." if war_schema else ""))
+    return go(f"/objekte/{oid}/laufkarten")
+
+
+@app.post("/plaene/{pid}/loeschen")
+async def plan_loeschen(pid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    await read_form(request)
+    plan = need(db.get(m.Plan, pid))
+    o = objekt_for(db, user, plan.objekt_id)
+    o.plaene.remove(plan)
+    db.commit()
+    flash(request, "Plan gelöscht. Eingezeichnete Wege und Melder bleiben gespeichert.")
+    return go(f"/objekte/{o.id}/laufkarten")
+
+
+@app.get("/plaene/{pid}")
+def plan_bild(pid: int, user: m.User = Depends(allow("objekte:1")), db: Session = Depends(get_db)):
+    plan = need(db.get(m.Plan, pid))
+    objekt_for(db, user, plan.objekt_id)
+    return plan_antwort(plan)
+
+
+@app.post("/objekte/{oid}/laufkarten/schema")
+async def laufkarten_schema(oid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    await read_form(request)
+    o = objekt_for(db, user, oid)
+    anzahl = laufkarte.schema_erzeugen(db, o)
+    db.commit()
+    flash(request, f"{anzahl} Schemapläne erzeugt, Melder und Laufwege dort eingetragen." if anzahl
+          else "Alle Etagen haben einen hochgeladenen Plan; es wurde nichts geändert.")
+    return go(f"/objekte/{oid}/laufkarten")
+
+
+@app.get("/gruppen/{gid}/laufkarte")
+def laufkarte_bearbeiten(gid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    g = need(db.get(m.Gruppe, gid))
+    o = objekt_for(db, user, g.objekt_id)
+    k = laufkarte.karte(o, g)
+    daten = {"gleich": k["gleich"], "fiz": k["fiz"], "weg1": k["weg1"], "weg2": [] if k["gleich"] else k["weg2"],
+             "melder": [{"id": x.id, "nr": x.nummer, "hfm": x.typ == "hfm", "x": x.px, "y": x.py} for x in g.melder]}
+    nachbarn = [x.id for x in o.gruppen]
+    i = nachbarn.index(g.id)
+    return page(request, "laufkarte_form.html", user, o=o, k=k, daten=daten, planpfad="/plaene/",
+                davor=nachbarn[i - 1] if i else None, danach=nachbarn[i + 1] if i + 1 < len(nachbarn) else None)
+
+
+@app.post("/gruppen/{gid}/laufkarte")
+async def laufkarte_speichern(gid: int, request: Request, user: m.User = Depends(allow("objekte:2")), db: Session = Depends(get_db)):
+    form = await read_form(request)
+    g = need(db.get(m.Gruppe, gid))
+    o = objekt_for(db, user, g.objekt_id)
+    g.laufweg, g.hinweis = text(form, "laufweg", 1500), text(form, "hinweis", 1000)
+    g.weg1 = json.dumps(laufkarte.punkte(str(form.get("weg1", ""))[:4000]))
+    g.weg2 = "" if g.etage == laufkarte.fiz_etage(o) else json.dumps(laufkarte.punkte(str(form.get("weg2", ""))[:4000]))
+    try:
+        fiz = json.loads(str(form.get("fiz", ""))[:100] or "null")
+        lagen = json.loads(str(form.get("melder", ""))[:8000] or "{}")
+    except ValueError:
+        fiz, lagen = None, {}
+    if isinstance(fiz, list) and len(fiz) == 2 and laufkarte.lage(fiz[0]) is not None and laufkarte.lage(fiz[1]) is not None:
+        o.fiz_etage, o.fiz_x, o.fiz_y = laufkarte.fiz_etage(o), laufkarte.lage(fiz[0]), laufkarte.lage(fiz[1])
+    if isinstance(lagen, dict):
+        for x in g.melder:
+            p = lagen.get(str(x.id))
+            if isinstance(p, list) and len(p) == 2 and laufkarte.lage(p[0]) is not None and laufkarte.lage(p[1]) is not None:
+                x.px, x.py = laufkarte.lage(p[0]), laufkarte.lage(p[1])
+            elif p is None and str(x.id) in lagen:
+                x.px = x.py = None
+    db.commit()
+    flash(request, f"Laufkarte {sim.nr(g.nummer)} gespeichert.")
+    return go(f"/gruppen/{gid}/laufkarte")
+
+
+@app.get("/objekte/{oid}/laufkarten/druck")
+def laufkarten_druck(oid: int, request: Request, gruppe: int = 0, user: m.User = Depends(allow("objekte:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
+    karten = [laufkarte.karte(o, g) for g in o.gruppen if not gruppe or g.nummer == gruppe]
+    return page(request, "laufkarten_druck.html", user, o=o, karten=karten, planpfad="/plaene/", zurueck=f"/objekte/{oid}/laufkarten")
+
+
 # ---------- Anzeigen für die Übenden (ohne Anmeldung, über die geheime Adresse) ----------
 
 def objekt_zu(db: Session, token: str) -> m.Objekt:
@@ -660,6 +804,38 @@ def anzeige_bmz(token: str, request: Request, db: Session = Depends(get_db)):
 def anzeige_verzeichnis(token: str, request: Request, db: Session = Depends(get_db)):
     o = objekt_zu(db, token)
     return anzeige(request, "verzeichnis.html", o, etagen=katalog.etagen(o))
+
+
+@app.get("/a/{token}/laufkarten")
+def anzeige_laufkarten(token: str, request: Request, db: Session = Depends(get_db)):
+    o = objekt_zu(db, token)
+    return anzeige(request, "anzeige_laufkarten.html", o, etagen=katalog.etagen(o))
+
+
+@app.get("/a/{token}/laufkarten/alle")
+def anzeige_laufkarten_alle(token: str, request: Request, db: Session = Depends(get_db)):
+    o = objekt_zu(db, token)
+    return anzeige(request, "laufkarten_druck.html", o, karten=[laufkarte.karte(o, g) for g in o.gruppen],
+                   planpfad=f"/a/{token}/plan/", zurueck=f"/a/{token}/laufkarten", perm={})
+
+
+@app.get("/a/{token}/laufkarte/{nummer}")
+def anzeige_laufkarte(token: str, nummer: int, request: Request, db: Session = Depends(get_db)):
+    o = objekt_zu(db, token)
+    nummern = [g.nummer for g in o.gruppen]
+    g = need(next((g for g in o.gruppen if g.nummer == nummer), None))
+    i = nummern.index(nummer)
+    return anzeige(request, "anzeige_laufkarte.html", o, k=laufkarte.karte(o, g), planpfad=f"/a/{token}/plan/",
+                   davor=nummern[i - 1] if i else None, danach=nummern[i + 1] if i + 1 < len(nummern) else None)
+
+
+@app.get("/a/{token}/plan/{pid}")
+def anzeige_plan(token: str, pid: int, db: Session = Depends(get_db)):
+    o = objekt_zu(db, token)
+    plan = need(db.get(m.Plan, pid))
+    if plan.objekt_id != o.id:
+        raise HTTPException(404, "Nicht gefunden")
+    return plan_antwort(plan)
 
 
 @app.get("/a/{token}/state")

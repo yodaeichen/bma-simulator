@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Hilfe</h1>
-<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#live">Live-Bild</a> &middot; <a href="#rechte">Benutzer und Sicherung</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
+<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#laufkarten">Laufkarten</a> &middot; <a href="#live">Live-Bild</a> &middot; <a href="#rechte">Benutzer und Sicherung</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
 
 <div class="card" id="ablauf">
   <h2>Ablauf einer Übung</h2>
@@ -9,7 +9,7 @@
     <li>Unter „Objekte“ ein Objekt wählen und „Übung öffnen“. Das ist die Ausbilderansicht.</li>
     <li>Auf dem Gerät der Übenden die Adresse aus „Anzeigen für die Übenden“ öffnen (QR-Code scannen) und „FAT und FBF“ wählen. Dort „Ton ein“ drücken, damit der Summer zu hören ist.</li>
     <li>In der Ausbilderansicht einen Melder anklicken. Das FAT zeigt die Meldung, die ÜE löst aus.</li>
-    <li>Die Übenden lesen Gruppe und Melder ab, suchen den Weg im Meldergruppenverzeichnis und erkunden.</li>
+    <li>Die Übenden lesen Gruppe und Melder ab, nehmen die Laufkarte dieser Gruppe (ausgedruckt oder unter „Laufkarten“) und erkunden.</li>
     <li>Zum Schluss stellen die Übenden am FBF die BMZ zurück. Alles, was bedient wurde, steht im Übungsprotokoll.</li>
   </ol>
 </div>
@@ -24,6 +24,7 @@
       „ÜE prüfen“ löst die Übertragung zur Leitstelle aus. „BMZ rückstellen“ löscht die Alarme.</td></tr>
     <tr><td><strong>BMZ</strong><br>Brandmelderzentrale</td><td>Alle Meldungen mit Uhrzeit, Melderart und vollem Ort. Rückstellen geht erst nach „Bedienung freigeben“.</td></tr>
     <tr><td><strong>Meldergruppen</strong></td><td>Verzeichnis aller Gruppen und Melder des Objekts, zum Nachschlagen oder Ausdrucken.</td></tr>
+    <tr><td><strong>Laufkarten</strong></td><td>Je Meldergruppe eine Karte: vorn der Laufweg von der FIZ, hinten die Lage der Melder. Nach Nummern geordnet wie im Laufkartendepot.</td></tr>
   </table>
   <p class="hint">FAT und FBF sind in Aufbau und Beschriftung an DIN 14662 und DIN 14661 angelehnt. Die BMZ ist ein allgemeines Bedienteil ohne Vorbild eines bestimmten Herstellers.</p>
 </div>
@@ -36,6 +37,18 @@
     <li>Die Etage gehört zur Gruppe. In der Ausbilderansicht lässt sich nach Etagen filtern.</li>
     <li>Eine vorhandene Liste lässt sich als CSV herunterladen, in Excel ändern und wieder einlesen. „Objekt kopieren“ legt ein zweites Objekt mit derselben Liste an.</li>
   </ol>
+</div>
+
+<div class="card" id="laufkarten">
+  <h2>Laufkarten</h2>
+  <ol class="steps">
+    <li>Beim Objekt „Laufkarten“ öffnen. Jede Etage braucht einen Plan: ein eigenes Bild hochladen oder „Schemapläne erzeugen“.</li>
+    <li>Ein Schemaplan ist ein einfacher, nicht maßstäblicher Plan aus der Melderliste. Melder, FIZ und Laufwege trägt der Simulator dort selbst ein.</li>
+    <li>Bei eigenen Plänen je Gruppe „Bearbeiten“: Werkzeug wählen und in den Plan klicken. Der Standort der FIZ gilt für das ganze Objekt.</li>
+    <li>„Alle Laufkarten drucken“ für den Ausdruck im Querformat A4. Beidseitig drucken und an der kurzen Kante wenden, dann stehen Übersicht und Detail auf einem Blatt.</li>
+    <li>Am Tablet oder Beamer öffnen die Übenden „Laufkarten“ unter der Adresse der Anzeigen.</li>
+  </ol>
+  <p class="hint">Nach Änderungen an der Melderliste die Schemapläne neu erzeugen. Eigene Pläne und was darauf eingezeichnet ist, bleiben dabei erhalten.</p>
 </div>
 
 <div class="card" id="live">

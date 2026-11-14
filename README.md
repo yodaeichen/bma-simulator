@@ -14,7 +14,9 @@ Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md). Die laufen
 | **Melderliste** | Ausbilder | Gruppen und Melder eines Objekts anlegen, als CSV einlesen und herunterladen |
 | **FAT und FBF** | Übende | Feuerwehr-Anzeigetableau und Feuerwehr-Bedienfeld |
 | **BMZ** | Übende | Anzeige- und Bedienteil der Brandmelderzentrale |
-| **Meldergruppen** | Übende | Verzeichnis der Gruppen und Melder, als Ersatz für die Laufkarten |
+| **Laufkarten** | Ausbilder | Pläne je Etage, Laufwege und Melder einzeichnen, alle Karten drucken |
+| **Meldergruppen** | Übende | Verzeichnis der Gruppen und Melder |
+| **Laufkarten** (Anzeige) | Übende | Feuerwehr-Laufkarten je Meldergruppe auf Tablet oder Beamer |
 | **Benutzer** | Administrator | Benutzer anlegen, Rechte je Bereich, Beschränkung auf Objekte, Einmal-Link für das Passwort |
 | **Sicherung** | Administrator | Datenbank herunterladen oder auf dem Server ablegen |
 
@@ -44,6 +46,23 @@ Die Ausbilderansicht zeigt für jede geöffnete Anzeige eine kleine Kachel: den 
 die Anzeigeebene, ob das FBF aufgeschlossen ist, ob der Ton eingeschaltet ist und welche Taste zuletzt gedrückt wurde,
 auch wenn sie ohne Wirkung blieb (verschlossenes FBF). Ein Gerät, das sich sechs Sekunden nicht meldet, verschwindet.
 Das Live-Bild wird nicht gespeichert; was die Anlage verändert, steht wie bisher im Übungsprotokoll.
+
+## Feuerwehr-Laufkarten
+
+Jede Meldergruppe hat eine Laufkarte mit zwei Seiten: vorn die Etage der FIZ mit dem Laufweg, hinten die Etage der Gruppe
+mit ihren Meldern. Am Rand stehen der Laufweg in Worten, Besonderheiten und die Zeichenerklärung.
+
+- **Pläne:** je Etage ein eigenes Bild (PNG, JPG, WebP oder SVG, höchstens 4 MB; einen PDF-Plan vorher als Bild speichern)
+  oder ein **Schemaplan**. Den zeichnet der Simulator aus der Melderliste: Flur in der Mitte, die Räume darüber und darunter,
+  Treppenraum links, Zugang der Feuerwehr rechts. Er ist nicht maßstäblich und trägt Melder, FIZ und Laufwege gleich mit ein.
+- **Bearbeiten:** unter „Laufkarten" bei der Gruppe „Bearbeiten". Ein Klick in den Plan setzt den Standort der FIZ,
+  verlängert den Laufweg oder setzt den gewählten Melder.
+- **Aushändigen:** „Alle Laufkarten drucken" öffnet die Druckansicht (A4 quer, je Karte zwei Seiten; beidseitig drucken und
+  an der kurzen Kante wenden).
+- **Digital:** Die Übenden öffnen „Laufkarten" unter der Adresse der Anzeigen, auf dem Tablet oder am Beamer.
+
+Echte Laufkarten nach DIN 14675 erstellt der Errichter der Anlage aus den Bestandsplänen. Die Karten des Simulators sind
+daran angelehnt und für Übungen gedacht.
 
 ## Benutzer und Rechte
 

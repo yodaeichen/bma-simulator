@@ -1,0 +1,20 @@
+{% import "_laufkarte.html" as lk %}<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Laufkarten · {{ o.name }}</title>
+<link rel="stylesheet" href="/static/laufkarte.css?v=2">
+</head>
+<body class="druck">
+<div class="werkzeug">
+  <a href="{{ zurueck }}">Zurück</a>
+  <strong>{{ karten|length }} Laufkarte{{ 'n' if karten|length != 1 }} · {{ o.name }}</strong>
+  <span>Querformat A4, je Karte zwei Seiten. Für Vorder- und Rückseite auf einem Blatt beidseitig drucken (an der kurzen Kante wenden).</span>
+  <button type="button" data-drucken>Drucken</button>
+</div>
+{% for k in karten %}{{ lk.karte(o, k, planpfad) }}{% else %}<p class="werkzeug">Dieses Objekt hat noch keine Meldergruppen.</p>{% endfor %}
+<script src="/static/drucken.js?v=1"></script>
+</body>
+</html>

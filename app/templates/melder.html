@@ -2,6 +2,7 @@
 {% block content %}
 <div class="row"><h1>Melderliste: {{ o.name }}</h1>
   <div>{% if perm.uebung %}<a class="btn" href="/objekte/{{ o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a>{% endif %}
+    <a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Laufkarten</a>
     {% if perm.objekte == 2 %}<a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div></div>
 
 {% set darf = perm.objekte == 2 %}

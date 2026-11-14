@@ -4,7 +4,8 @@ import json
 # Bereich, Bezeichnung, erlaubte Stufen, Erklärung
 AREAS = [
     ("objekte", "Objekte und Melderlisten", [(1, "nur sehen"), (2, "bearbeiten")],
-     "Bearbeiten: Objekte anlegen, kopieren und löschen, Melderlisten ändern und einlesen, die Adresse der Anzeigen erneuern."),
+     "Sehen schließt Laufkarten ansehen und drucken ein. Bearbeiten: Objekte anlegen, kopieren und löschen, Melderlisten und Laufkarten ändern, "
+     "Pläne hochladen, die Adresse der Anzeigen erneuern."),
     ("uebung", "Übungen", [(0, "kein Zugriff"), (1, "zusehen"), (2, "steuern")],
      "Zusehen: die Ausbilderansicht mit Meldungen und Live-Bild öffnen, ohne etwas auszulösen. "
      "Steuern: Melder auslösen, stören, abschalten und die Anlage zurücksetzen."),

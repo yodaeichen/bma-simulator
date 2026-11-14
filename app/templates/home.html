@@ -19,6 +19,7 @@
     <div class="actions">
       {% if perm.uebung %}<a class="btn" href="/objekte/{{ k.o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a>{% endif %}
       <a class="btn light" href="/objekte/{{ k.o.id }}/melder">Melderliste</a>
+      <a class="btn light" href="/objekte/{{ k.o.id }}/laufkarten">Laufkarten</a>
     </div>
   </div>
 {% endfor %}

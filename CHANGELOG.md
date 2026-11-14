@@ -2,6 +2,19 @@
 
 Die Versionsnummer steht in `app/version.py` und wird unten auf jeder Seite des Simulators angezeigt.
 
+## 1.2.0
+
+- **Feuerwehr-Laufkarten** je Meldergruppe: Vorderseite mit dem Laufweg von der FIZ durch deren Etage, Rückseite mit der Etage
+  der Gruppe und der Lage ihrer Melder; dazu Laufweg in Worten, Besonderheiten und Zeichenerklärung
+- Ausdruck aller Karten oder einer einzelnen im Querformat A4 (je Seite der Karte ein Blatt, für beidseitigen Druck)
+- Die Übenden öffnen die Laufkarten auf Tablet oder Beamer unter „Laufkarten", nach Nummern geordnet wie im Laufkartendepot;
+  das Live-Bild zeigt, welche Karte gerade offen ist
+- Pläne je Etage: eigenes Bild hochladen (PNG, JPG, WebP, SVG bis 4 MB) oder einen Schemaplan erzeugen lassen, den der Simulator
+  aus der Melderliste zeichnet und in den er Melder, FIZ und Laufwege einträgt
+- Laufkarte bearbeiten: Standort der FIZ, Laufwege und Melder durch Klicken in den Plan setzen
+- Die Beispielobjekte bekommen beim ersten Start Schemapläne; bei vorhandenen Objekten genügt „Schemapläne erzeugen"
+- Pläne liegen in der Datenbank und sind damit Teil der Sicherung; „Objekt kopieren" nimmt Pläne und Laufkarten mit
+
 ## 1.1.0
 
 - **Live-Bild der Übenden** in der Ausbilderansicht: je geöffneter Anzeige eine kleine Kachel mit dem Text, den FAT oder BMZ

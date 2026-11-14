@@ -1,0 +1,17 @@
+{% extends "anzeige_base.html" %}
+{% import "_laufkarte.html" as lk %}
+{% block title %}Laufkarte {{ nr(k.g.nummer) }} · {{ o.name }}{% endblock %}
+{% block bodyclass %}seite-laufkarten{% endblock %}
+{% block leiste %}<button type="button" data-drucken>Drucken</button>{% endblock %}
+{% block content %}
+<main class="karte-ansicht" id="da" data-token="{{ o.token }}" data-geraet="lauf" data-info="Laufkarte {{ nr(k.g.nummer) }} {{ k.g.name }}">
+  <nav class="blaettern" aria-label="Laufkarten">
+    {% if davor %}<a href="/a/{{ o.token }}/laufkarte/{{ davor }}">◀ {{ nr(davor) }}</a>{% else %}<span></span>{% endif %}
+    <a href="/a/{{ o.token }}/laufkarten">Alle Laufkarten</a>
+    {% if danach %}<a href="/a/{{ o.token }}/laufkarte/{{ danach }}">{{ nr(danach) }} ▶</a>{% else %}<span></span>{% endif %}
+  </nav>
+  {{ lk.karte(o, k, planpfad) }}
+</main>
+<script src="/static/praesenz.js?v=2"></script>
+<script src="/static/drucken.js?v=1"></script>
+{% endblock %}

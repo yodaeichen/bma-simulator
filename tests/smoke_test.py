@@ -17,7 +17,7 @@ sys.path.insert(0, ROOT)
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import db as m  # noqa: E402
-from app import access, backup, katalog, live, sim  # noqa: E402
+from app import access, backup, katalog, laufkarte, live, sim  # noqa: E402
 from app.main import app  # noqa: E402
 from app.version import VERSION  # noqa: E402
 
@@ -235,6 +235,86 @@ with TestClient(app, base_url="http://testserver") as c:
     r = c.post(f"/objekte/{oid}/protokoll/leeren", data={"csrf": tok})
     assert c.get(f"/objekte/{oid}/protokoll.csv").text.count("\r\n") == 2, "Kopfzeile und der Vermerk über das Leeren"
 
+    # Laufkarten
+    assert laufkarte.bildart(b"\x89PNG\r\n\x1a\n....") == "image/png" and laufkarte.bildart(b"\xff\xd8\xff\xe0") == "image/jpeg"
+    assert laufkarte.bildart(b'<?xml version="1.0"?><svg xmlns="x"/>') == "image/svg+xml" and laufkarte.bildart(b"%PDF-1.7") is None
+    assert laufkarte.bildart(b"<html><svg>") is None
+    assert laufkarte.punkte('[[0.1,0.2],[2,0],["a",1],[0.5,0.5,0.5],[true,0],[1,1]]') == [[0.1, 0.2], [1.0, 1.0]] and laufkarte.punkte("{") == []
+    r = c.get(f"/objekte/{oid}/laufkarten")
+    assert r.text.count("Plan fehlt") == 3 and "Schemapläne erzeugen" in r.text, "selbst angelegtes Objekt hat noch keine Pläne"
+    r = c.get(f"/objekte/{oid}/laufkarten/druck")
+    assert r.text.count('class="lk-seite"') == 6 and "kein Plan hinterlegt" in r.text and "Feuerwehr-Laufkarte" in r.text
+    r = c.post(f"/objekte/{oid}/laufkarten/schema", data={"csrf": tok})
+    assert "3 Schemapläne erzeugt" in r.text and r.text.count("vollständig") == 3
+    with m.SessionLocal() as db:
+        o = db.get(m.Objekt, oid)
+        plaene = {pl.etage: pl.id for pl in o.plaene}
+        g6 = next(g for g in o.gruppen if g.nummer == 6)
+        k = laufkarte.karte(o, g6)
+        assert laufkarte.fiz_etage(o) == "EG" and not k["gleich"] and len(k["weg1"]) == 3 and len(k["weg2"]) >= 2 and k["fiz"]
+        assert all(x.px is not None and 0 < x.px < 1 and 0 < x.py < 1 for g in o.gruppen for x in g.melder)
+        assert k["schritte"][-1].endswith("Büro") and laufkarte.karte(o, o.gruppen[0])["gleich"]
+        g6id, m61 = g6.id, g6.melder[0].id
+    r = c.get(f"/plaene/{plaene['OG']}")
+    assert r.headers["content-type"].startswith("image/svg") and "sandbox" in r.headers["content-security-policy"] and "Schemaplan OG" in r.text
+    assert "Büro 1" in r.text and "Zugang Feuerwehr" not in r.text and "Zugang Feuerwehr" in c.get(f"/plaene/{plaene['EG']}").text
+    r = c.get(f"/objekte/{oid}/laufkarten/druck?gruppe=6")
+    assert r.text.count('class="lk-seite"') == 2 and "<polyline" in r.text and 'class="m melder hfm"' in r.text and "0006/02" in r.text
+    assert f'/plaene/{plaene["EG"]}"' in r.text and f'/plaene/{plaene["OG"]}"' in r.text, "vorn die Etage der FIZ, hinten die der Gruppe"
+    # von Hand bearbeiten
+    r = c.get(f"/gruppen/{g6id}/laufkarte")
+    assert "Vorderseite: EG" in r.text and "Rückseite: OG" in r.text and "laufkarte_edit.js" in r.text
+    r = c.post(f"/gruppen/{g6id}/laufkarte", data={"csrf": tok, "laufweg": "Durch die Halle\nTreppe Nord ins OG", "hinweis": "Zwischendecke <b>",
+                                                   "fiz": "[0.9, 0.5]", "weg1": "[[0.9,0.5],[0.5,0.5],[7,7]]", "weg2": "[[0.1,0.5],[0.4,0.2]]",
+                                                   "melder": '{"%d": [0.25, 0.75], "999999": [0.1, 0.1]}' % m61})
+    assert "Laufkarte 0006 gespeichert" in r.text
+    with m.SessionLocal() as db:
+        g6 = db.get(m.Gruppe, g6id)
+        assert g6.weg1 == "[[0.9, 0.5], [0.5, 0.5]]" and g6.weg2 == "[[0.1, 0.5], [0.4, 0.2]]" and (g6.melder[0].px, g6.melder[0].py) == (0.25, 0.75)
+        assert g6.objekt.fiz_x == 0.9 and g6.melder[1].px is not None, "nicht genannte Melder bleiben, wo sie sind"
+    r = c.get(f"/objekte/{oid}/laufkarten/druck?gruppe=6")
+    assert "Treppe Nord ins OG" in r.text and "Zwischendecke &lt;b&gt;" in r.text and "left:25.0%;top:75.0%" in r.text
+    # eigenen Plan hochladen
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    assert "muss ein Bild sein" in c.post(f"/objekte/{oid}/plan", data={"csrf": tok, "etage": "OG"}, files={"datei": ("plan.pdf", b"%PDF-1.7 ...", "application/pdf")}).text
+    assert "höchstens 4 MB" in c.post(f"/objekte/{oid}/plan", data={"csrf": tok, "etage": "OG"}, files={"datei": ("gross.png", png + b"0" * laufkarte.MAX_PLAN, "image/png")}).text
+    r = c.post(f"/objekte/{oid}/plan", data={"csrf": tok, "etage": "OG"}, files={"datei": ("og.png", png, "image/png")})
+    assert "Plan für „OG“ gespeichert" in r.text and "neu einzeichnen" in r.text and "eigener Plan" in r.text
+    assert c.get(f"/plaene/{plaene['OG']}").content == png
+    with m.SessionLocal() as db:
+        g6 = db.get(m.Gruppe, g6id)
+        assert g6.weg2 == "" and g6.melder[0].px is None and g6.weg1, "Lagen aus dem Schemaplan passen nicht zum neuen Bild"
+    r = c.post(f"/objekte/{oid}/laufkarten/schema", data={"csrf": tok})
+    assert "2 Schemapläne erzeugt" in r.text and c.get(f"/plaene/{plaene['OG']}").content == png, "eigene Pläne bleiben unberührt"
+    assert "Plan gelöscht" in c.post(f"/plaene/{plaene['OG']}/loeschen", data={"csrf": tok}).text
+    c.post(f"/objekte/{oid}/laufkarten/schema", data={"csrf": tok})
+    r = c.post(f"/objekte/{oid}/laufkarten/fiz", data={"csrf": tok, "fiz_etage": "OG"})
+    assert "Etage der FIZ geändert" in r.text
+    c.post(f"/objekte/{oid}/laufkarten/schema", data={"csrf": tok})
+    with m.SessionLocal() as db:
+        o = db.get(m.Objekt, oid)
+        assert laufkarte.fiz_etage(o) == "OG" and laufkarte.karte(o, db.get(m.Gruppe, g6id))["gleich"] and db.get(m.Gruppe, g6id).weg2 == ""
+        pid_og = laufkarte.plan_von(o, "OG").id
+        fremder_plan = db.query(m.Plan).filter(m.Plan.objekt_id != oid).first().id
+    assert "Zugang Feuerwehr" in c.get(f"/plaene/{pid_og}").text
+    # die Übenden
+    with TestClient(app, base_url="http://testserver") as gast:
+        r = gast.get(f"/a/{token}/laufkarten")
+        assert r.status_code == 200 and f"/a/{token}/laufkarte/6" in r.text and "0005" in r.text
+        r = gast.get(f"/a/{token}/laufkarte/6")
+        assert r.text.count('class="lk-seite"') == 2 and f"/a/{token}/plan/{pid_og}" in r.text and "/plaene/" not in r.text and "◀ 0005" in r.text
+        assert gast.get(f"/a/{token}/laufkarte/99").status_code == 404
+        assert gast.get(f"/a/{token}/laufkarten/alle").text.count('class="lk-seite"') == 6
+        assert gast.get(f"/a/{token}/plan/{pid_og}").status_code == 200
+        assert gast.get(f"/a/{token}/plan/{fremder_plan}").status_code == 404, "Pläne anderer Objekte bleiben verborgen"
+        assert gast.get(f"/plaene/{pid_og}", follow_redirects=False).status_code == 303
+        gast.get(f"/a/{token}/da", params={"c": "lk12lk12", "g": "lauf", "i": "Laufkarte 0006 Büro"})
+        bild = c.get(f"/objekte/{oid}/state?v=0").json()["live"]
+        assert bild[-1]["name"] == "Laufkarten" and bild[-1]["info"] == "Laufkarte 0006 Büro"
+    live.vergessen(oid)
+    assert c.get("/plaene/%d" % fremder_plan).status_code == 200, "Beispielobjekte haben von Anfang an Schemapläne"
+    assert c.get("/objekte/1/laufkarten").text.count("vollständig") == 9
+
     # Adresse erneuern, kopieren, löschen
     c.post(f"/objekte/{oid}/link-erneuern", data={"csrf": tok})
     assert c.get(f"/a/{token}/fat").status_code == 404, "die alte Adresse gilt nicht mehr"
@@ -243,6 +323,7 @@ with TestClient(app, base_url="http://testserver") as c:
     with m.SessionLocal() as db:
         kopie = db.query(m.Objekt).filter(m.Objekt.name.like("%(Kopie)")).one()
         assert sum(len(g.melder) for g in kopie.gruppen) == 5 and kopie.token != token
+        assert len(kopie.plaene) == 3 and kopie.fiz_etage == "OG" and all(x.px is not None for g in kopie.gruppen for x in g.melder)
         kid = kopie.id
     assert c.post(f"/melder/{ids[(7, 1)]}/loeschen", data={"csrf": tok}).status_code == 200
     with m.SessionLocal() as db:
@@ -368,6 +449,13 @@ alt_db = os.path.join(m.DATA_DIR, "alt.db")
 con = sqlite3.connect(alt_db)
 con.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(80), password_hash VARCHAR(200), is_admin BOOLEAN NOT NULL DEFAULT 0, last_login DATETIME)")
 con.execute("INSERT INTO users (username, password_hash, is_admin) VALUES ('chef', 'x', 1), ('azubi', 'x', 0)")
+con.execute("CREATE TABLE objekte (id INTEGER PRIMARY KEY, name VARCHAR(120), adresse VARCHAR(200) DEFAULT '', bma_nr VARCHAR(40) DEFAULT '', "
+            "hinweis TEXT DEFAULT '', loeschanlage BOOLEAN DEFAULT 0, token VARCHAR(40), state TEXT DEFAULT '')")
+con.execute("CREATE TABLE gruppen (id INTEGER PRIMARY KEY, objekt_id INTEGER, nummer INTEGER, name VARCHAR(80), etage VARCHAR(40))")
+con.execute("CREATE TABLE melder (id INTEGER PRIMARY KEY, gruppe_id INTEGER, nummer INTEGER, typ VARCHAR(10), ort VARCHAR(80))")
+con.execute("INSERT INTO objekte (name, token) VALUES ('Altbau', 'tokentokentoken')")
+con.execute("INSERT INTO gruppen (objekt_id, nummer, name, etage) VALUES (1, 1, 'Flur', 'EG'), (1, 2, 'Büro', 'OG')")
+con.execute("INSERT INTO melder (gruppe_id, nummer, typ, ort) VALUES (1, 1, 'hfm', 'Flur'), (2, 1, 'rm', 'Büro 1')")
 con.commit()
 con.close()
 from sqlalchemy import create_engine  # noqa: E402
@@ -380,6 +468,11 @@ try:
     with Session(m.engine) as db:
         rollen = {u.username: (access.role_of(u), access.sees_all(u)) for u in db.query(m.User)}
     assert rollen == {"chef": ("Administrator", True), "azubi": ("Ausbilder", True)}, rollen
+    m.Base.metadata.create_all(m.engine)  # legt die neue Tabelle der Pläne an
+    with Session(m.engine) as db:  # ein Objekt aus Version 1.0 bekommt Laufkarten per Knopfdruck
+        altbau = db.get(m.Objekt, 1)
+        assert altbau.fiz_x is None and altbau.gruppen[0].weg1 == "" and altbau.gruppen[1].melder[0].px is None
+        assert laufkarte.schema_erzeugen(db, altbau) == 2 and all(s["plan"] and s["weg"] for s in laufkarte.stand(altbau))
 finally:
     m.engine = haupt
 

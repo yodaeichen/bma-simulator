@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Laufkarten · {{ o.name }}{% endblock %}
+{% block content %}
+{% set darf = perm.objekte == 2 %}
+<div class="row"><h1>Laufkarten: {{ o.name }}</h1>
+  <div><a class="btn" href="/objekte/{{ o.id }}/laufkarten/druck" target="_blank" rel="noopener">Alle Laufkarten drucken</a>
+    {% if perm.uebung %}<a class="btn light" href="/objekte/{{ o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a>{% endif %}
+    <a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a></div></div>
+
+<div class="card">
+  <h2>Pläne je Etage</h2>
+  <p class="hint">Eine Laufkarte zeigt vorn den Weg von der FIZ durch deren Etage und hinten die Etage der Meldergruppe mit ihren Meldern.
+    Dafür braucht jede Etage einen Plan: ein eigenes Bild oder einen Schemaplan, den der Simulator aus der Melderliste zeichnet.</p>
+  <table>
+    <tr><th>Etage</th><th>Plan</th><th></th></tr>
+    {% for e in etagen %}{% set pl = plaene.get(e) %}
+    <tr><td><strong>{{ e or "Ohne Etage" }}</strong>{% if e == fiz_etage %} <span class="tag gesendet">FIZ</span>{% endif %}</td>
+      <td>{% if pl %}<a href="/plaene/{{ pl.id }}" target="_blank" rel="noopener">{{ "Schemaplan" if pl.schema else "eigener Plan" }}</a>{% else %}<span class="tag fehler">fehlt</span>{% endif %}</td>
+      <td class="r">{% if darf and pl %}<form class="inline" method="post" action="/plaene/{{ pl.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Plan für {{ e or 'Ohne Etage' }} löschen?">Plan löschen</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="3">Noch keine Meldergruppen. Zuerst die <a href="/objekte/{{ o.id }}/melder">Melderliste</a> anlegen.</td></tr>{% endfor %}
+  </table>
+  {% if darf and etagen %}
+  <div class="grid" style="margin-top:14px">
+    <form method="post" action="/objekte/{{ o.id }}/plan" enctype="multipart/form-data">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <h3>Eigenen Plan hochladen</h3>
+      <label for="etage">Etage</label><select id="etage" name="etage">{% for e in etagen %}<option value="{{ e }}">{{ e or "Ohne Etage" }}</option>{% endfor %}</select>
+      <label for="datei">Bilddatei</label><input type="file" id="datei" name="datei" accept=".png,.jpg,.jpeg,.webp,.svg,image/*" required>
+      <p class="hint">PNG, JPG, WebP oder SVG, höchstens 4 MB. Einen PDF-Plan vorher als Bild speichern. Ersetzt einen vorhandenen Plan dieser Etage.</p>
+      <div class="actions"><button>Hochladen</button></div>
+    </form>
+    <div>
+      <form method="post" action="/objekte/{{ o.id }}/laufkarten/schema">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <h3>Schemapläne erzeugen</h3>
+        <p class="hint">Zeichnet für jede Etage ohne eigenen Plan einen einfachen, nicht maßstäblichen Plan mit Flur, Räumen und Treppenraum und trägt dort Melder, FIZ und Laufwege ein. Vorhandene Schemapläne werden neu gezeichnet, zum Beispiel nach Änderungen an der Melderliste. Eigene Pläne bleiben unberührt.</p>
+        <div class="actions"><button class="light" data-frage="Schemapläne neu zeichnen? Auf Schemaplänen von Hand eingezeichnete Wege und Melder werden überschrieben.">Schemapläne erzeugen</button></div>
+      </form>
+      <form method="post" action="/objekte/{{ o.id }}/laufkarten/fiz">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="fiz_etage">Etage der FIZ (Zugang der Feuerwehr)</label>
+        <select id="fiz_etage" name="fiz_etage">{% for e in etagen %}<option value="{{ e }}" {{ 'selected' if e == fiz_etage }}>{{ e or "Ohne Etage" }}</option>{% endfor %}</select>
+        <div class="actions"><button class="light">Ändern</button></div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>{{ stand|length }} Laufkarten</h2>
+  <table>
+    <tr><th>Gruppe</th><th>Etage</th><th>Bereich</th><th>Stand</th><th></th></tr>
+    {% for s in stand %}
+    <tr><td><strong>{{ nr(s.g.nummer) }}</strong></td><td>{{ s.g.etage }}</td><td>{{ s.g.name }}</td>
+      <td>{% if s.plan and s.weg and s.gesetzt == s.g.melder|length %}<span class="tag gesendet">vollständig</span>{% else %}
+        {% if not s.plan %}<span class="tag fehler">Plan fehlt</span>{% endif %}
+        {% if not s.weg %}<span class="tag test">Laufweg nicht gezeichnet</span>{% endif %}
+        {% if s.gesetzt != s.g.melder|length %}<span class="tag test">{{ s.gesetzt }} von {{ s.g.melder|length }} Meldern im Plan</span>{% endif %}{% endif %}
+        {% if not s.text %}<span class="tag">ohne Beschreibung</span>{% endif %}</td>
+      <td class="r"><a class="btn light klein" href="/objekte/{{ o.id }}/laufkarten/druck?gruppe={{ s.g.nummer }}" target="_blank" rel="noopener">Ansehen</a>
+        {% if darf %}<a class="btn light klein" href="/gruppen/{{ s.g.id }}/laufkarte">Bearbeiten</a>{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <p class="hint">Die Übenden finden die Laufkarten auf ihrem Gerät unter „Laufkarten“, nach Nummern geordnet wie im Laufkartendepot.</p>
+</div>
+<script src="/static/frage.js?v=1"></script>
+{% endblock %}

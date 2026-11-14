@@ -5,7 +5,7 @@
 <div class="row">
   <div><h1>{{ o.name }} <span class="tag" id="lage">…</span></h1>
     <p class="hint">{{ "Ausbilderansicht" if perm.uebung == 2 else "Ausbilderansicht, nur zum Zusehen" }}{% if o.bma_nr %} &middot; {{ o.bma_nr }}{% endif %}{% if o.adresse %} &middot; {{ o.adresse }}{% endif %}</p></div>
-  <div><a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a>{% if perm.objekte == 2 %} <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div>
+  <div><a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Laufkarten</a> <a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a>{% if perm.objekte == 2 %} <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div>
 </div>
 {% if o.hinweis %}<div class="flash note">{{ o.hinweis }}</div>{% endif %}
 <div class="flash err" id="offline" hidden>Keine Verbindung zum Server. Die Ansicht aktualisiert sich, sobald er wieder erreichbar ist.</div>
@@ -109,6 +109,7 @@
             <a class="btn light klein" href="/a/{{ o.token }}/fat" target="_blank" rel="noopener">FAT und FBF</a>
             <a class="btn light klein" href="/a/{{ o.token }}/bmz" target="_blank" rel="noopener">BMZ</a>
             <a class="btn light klein" href="/a/{{ o.token }}/verzeichnis" target="_blank" rel="noopener">Verzeichnis</a>
+            <a class="btn light klein" href="/a/{{ o.token }}/laufkarten" target="_blank" rel="noopener">Laufkarten</a>
           </div>
           {% if perm.objekte == 2 %}<form method="post" action="/objekte/{{ o.id }}/link-erneuern"><input type="hidden" name="csrf" value="{{ csrf }}">
             <button class="link" data-frage="Neue Adresse vergeben? Geöffnete Anzeigen verlieren die Verbindung.">Adresse erneuern</button></form>{% endif %}
@@ -126,5 +127,5 @@
   </aside>
 </div>
 <script src="/static/frage.js?v=1"></script>
-<script src="/static/leitstand.js?v=2"></script>
+<script src="/static/leitstand.js?v=3"></script>
 {% endblock %}

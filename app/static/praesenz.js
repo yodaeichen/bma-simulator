@@ -9,7 +9,7 @@
     try { window.sessionStorage.setItem("bma-geraet", cid); } catch (e) { /* egal */ }
   }
   function ping() {
-    fetch("/a/" + el.dataset.token + "/da?c=" + cid + "&g=" + el.dataset.geraet, { cache: "no-store" }).catch(function () {});
+    fetch("/a/" + el.dataset.token + "/da?c=" + cid + "&g=" + el.dataset.geraet + "&i=" + encodeURIComponent(el.dataset.info || ""), { cache: "no-store" }).catch(function () {});
   }
   ping();
   window.setInterval(ping, 2000);

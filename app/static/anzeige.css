@@ -78,3 +78,12 @@ button:focus-visible, a:focus-visible { outline:3px solid #6cb2ff; outline-offse
 .verzeichnis th, .verzeichnis td { text-align:left; padding:7px 10px; border-bottom:1px solid #d0d3d6; } .verzeichnis th { font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#5d6268; }
 .verzeichnis td:first-child { font-variant-numeric:tabular-nums; white-space:nowrap; width:130px; } .verzeichnis tr.gruppe td { background:#dfe2e4; font-weight:700; }
 @media print { body { background:#fff; color:#000; } .leiste, .fuss { display:none; } .verzeichnis p, .verzeichnis h2 { color:#000; } }
+
+/* Laufkarten auf dem Gerät der Übenden */
+.depot { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:10px; }
+.depot a { background:#f4f5f5; color:#20252b; border-radius:6px; border-top:6px solid #c8102e; padding:10px 12px; text-decoration:none; }
+.depot a:hover { background:#fff; } .depot b { display:block; font-size:24px; font-variant-numeric:tabular-nums; } .depot span { font-size:13px; color:#5d6268; }
+.verzeichnis a.alle { color:#aeb6c2; }
+.karte-ansicht { padding:14px 12px 4px; }
+.blaettern { display:flex; justify-content:space-between; gap:12px; max-width:1180px; margin:0 auto 12px; }
+.blaettern a { color:#e8eaed; text-decoration:none; border:1px solid #5b6470; border-radius:6px; padding:6px 14px; } .blaettern a:hover { border-color:#fff; }

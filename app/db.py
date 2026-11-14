@@ -3,7 +3,7 @@ import datetime as dt
 import os
 import secrets
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
@@ -65,8 +65,13 @@ class Objekt(Base):
     token: Mapped[str] = mapped_column(String(40), unique=True, default=new_token)
     # Laufender Zustand der Anlage als JSON (siehe sim.py)
     state: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Laufkarten: Etage, in der die Feuerwehr-Informationszentrale (FIZ) liegt, und ihr Standort im Plan (0 bis 1)
+    fiz_etage: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    fiz_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fiz_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     gruppen: Mapped[list["Gruppe"]] = relationship(back_populates="objekt", cascade="all, delete-orphan",
                                                     order_by="Gruppe.nummer")
+    plaene: Mapped[list["Plan"]] = relationship(back_populates="objekt", cascade="all, delete-orphan")
     protokoll: Mapped[list["Protokoll"]] = relationship(cascade="all, delete-orphan")
 
 
@@ -79,6 +84,11 @@ class Gruppe(Base):
     nummer: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(80), default="")
     etage: Mapped[str] = mapped_column(String(40), default="")
+    # Laufkarte: Laufweg in Worten (je Zeile ein Schritt), Besonderheiten und die gezeichneten Wege als JSON [[x, y], ...]
+    laufweg: Mapped[str] = mapped_column(Text, default="", server_default="")
+    hinweis: Mapped[str] = mapped_column(Text, default="", server_default="")
+    weg1: Mapped[str] = mapped_column(Text, default="", server_default="")  # im Plan der FIZ-Etage (Vorderseite)
+    weg2: Mapped[str] = mapped_column(Text, default="", server_default="")  # im Plan der eigenen Etage, falls eine andere
     objekt: Mapped[Objekt] = relationship(back_populates="gruppen")
     melder: Mapped[list["Melder"]] = relationship(back_populates="gruppe", cascade="all, delete-orphan",
                                                    order_by="Melder.nummer")
@@ -92,7 +102,22 @@ class Melder(Base):
     nummer: Mapped[int] = mapped_column(Integer)
     typ: Mapped[str] = mapped_column(String(10), default="rm")
     ort: Mapped[str] = mapped_column(String(80), default="")
+    px: Mapped[float | None] = mapped_column(Float, nullable=True)  # Lage im Plan der Etage (0 bis 1)
+    py: Mapped[float | None] = mapped_column(Float, nullable=True)
     gruppe: Mapped[Gruppe] = relationship(back_populates="melder")
+
+
+class Plan(Base):
+    """Grundriss einer Etage für die Laufkarten: hochgeladenes Bild oder erzeugter Schemaplan."""
+    __tablename__ = "plaene"
+    __table_args__ = (UniqueConstraint("objekt_id", "etage"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objekt_id: Mapped[int] = mapped_column(ForeignKey("objekte.id", ondelete="CASCADE"))
+    etage: Mapped[str] = mapped_column(String(40), default="")
+    mime: Mapped[str] = mapped_column(String(40))
+    daten: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    schema: Mapped[bool] = mapped_column(Boolean, default=False)  # vom Simulator gezeichnet, nicht maßstäblich
+    objekt: Mapped[Objekt] = relationship(back_populates="plaene")
 
 
 class Protokoll(Base):
@@ -105,8 +130,12 @@ class Protokoll(Base):
     text: Mapped[str] = mapped_column(Text, default="")
 
 
-# Spalten, die nach Version 1.0 dazukamen: bestehende Datenbanken werden beim Start ergänzt.
+# Spalten, die nach Version 1.0 dazukamen (Rechte in 1.1, Laufkarten in 1.2): bestehende Datenbanken werden beim Start ergänzt.
 ADDED_COLUMNS = {
+    "objekte": {"fiz_etage": "VARCHAR(40) NOT NULL DEFAULT ''", "fiz_x": "FLOAT", "fiz_y": "FLOAT"},
+    "gruppen": {"laufweg": "TEXT NOT NULL DEFAULT ''", "hinweis": "TEXT NOT NULL DEFAULT ''",
+                "weg1": "TEXT NOT NULL DEFAULT ''", "weg2": "TEXT NOT NULL DEFAULT ''"},
+    "melder": {"px": "FLOAT", "py": "FLOAT"},
     "users": {
         "perms": "TEXT",
         "all_objekte": "BOOLEAN NOT NULL DEFAULT 1",
@@ -122,6 +151,8 @@ def add_missing_columns():
     with engine.begin() as conn:
         for table, columns in ADDED_COLUMNS.items():
             existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            if not existing:
+                continue  # Tabelle gibt es noch nicht: create_all legt sie vollständig an
             for name, ddl in columns.items():
                 if name not in existing:
                     conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")

@@ -1,0 +1,59 @@
+{# Eine Laufkarte mit Vorder- und Rückseite. k kommt aus laufkarte.karte(), planpfad ist die Adresse der Planbilder. #}
+{% macro plan(pl, etage, weg, fiz, melder, planpfad) %}
+{% if pl %}
+<div class="plan">
+  <img src="{{ planpfad }}{{ pl.id }}" alt="Plan {{ etage or 'ohne Etage' }}">
+  {% if weg|length > 1 %}<svg viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"><polyline points="{% for p in weg %}{{ (p[0] * 1000)|round(1) }},{{ (p[1] * 1000)|round(1) }} {% endfor %}"/></svg>{% endif %}
+  {% if weg %}<i class="m ziel" style="left:{{ weg[-1][0] * 100 }}%;top:{{ weg[-1][1] * 100 }}%"></i>{% endif %}
+  {% if fiz %}<i class="m fiz" style="left:{{ fiz[0] * 100 }}%;top:{{ fiz[1] * 100 }}%">FIZ</i>{% elif weg %}<i class="m start" style="left:{{ weg[0][0] * 100 }}%;top:{{ weg[0][1] * 100 }}%"></i>{% endif %}
+  {% for x in melder if x.px is not none %}<i class="m melder{{ ' hfm' if x.typ == 'hfm' }}" style="left:{{ x.px * 100 }}%;top:{{ x.py * 100 }}%">{{ x.nummer }}</i>{% endfor %}
+  {% if pl.schema %}<span class="schema">Schemaplan</span>{% endif %}
+</div>
+{% else %}
+<div class="plan-leer">Für „{{ etage or 'Ohne Etage' }}“ ist kein Plan hinterlegt.</div>
+{% endif %}
+{% endmacro %}
+
+{% macro kopf(o, k, seite) %}
+<header class="lk-kopf">
+  <div class="lk-titel">Feuerwehr-Laufkarte<small>{{ seite }}</small></div>
+  <div class="lk-objekt"><b>{{ o.name }}</b><span>{{ o.adresse }}{% if o.bma_nr %} · {{ o.bma_nr }}{% endif %}</span></div>
+  <div class="lk-nummer"><small>Meldergruppe</small><b>{{ nr(k.g.nummer) }}</b></div>
+</header>
+<dl class="lk-daten">
+  <div><dt>Geschoss</dt><dd>{{ k.g.etage or '–' }}</dd></div>
+  <div><dt>Bereich</dt><dd>{{ k.g.name or '–' }}</dd></div>
+  <div><dt>Melderart</dt><dd>{{ k.arten|join(', ') or '–' }}</dd></div>
+  <div><dt>Anzahl Melder</dt><dd>{{ k.g.melder|length }}</dd></div>
+</dl>
+{% endmacro %}
+
+{% macro karte(o, k, planpfad) %}
+<article class="lk" id="lk-{{ k.g.nummer }}">
+  <section class="lk-seite">
+    {{ kopf(o, k, 'Vorderseite · Übersicht ' ~ (k.fiz_etage or '')) }}
+    <div class="lk-koerper">
+      <div class="lk-plan">{{ plan(k.plan1, k.fiz_etage, k.weg1, k.fiz, [], planpfad) }}</div>
+      <aside class="lk-rand">
+        <h3>Laufweg</h3>
+        {% if k.schritte %}<ol>{% for s in k.schritte %}<li>{{ s }}</li>{% endfor %}</ol>{% else %}<p class="leer">Kein Laufweg beschrieben.</p>{% endif %}
+        {% if k.g.hinweis %}<h3>Besonderheiten</h3><p class="warn">{{ k.g.hinweis }}</p>{% endif %}
+        <h3>Zeichen</h3>
+        <ul class="legende"><li><i class="m fiz">FIZ</i> Standort (FIZ)</li><li><i class="linie"></i> Laufweg</li><li><i class="m ziel"></i> Ziel{% if not k.gleich %}: weiter auf der Rückseite{% endif %}</li></ul>
+      </aside>
+    </div>
+  </section>
+  <section class="lk-seite">
+    {{ kopf(o, k, 'Rückseite · Detail ' ~ (k.g.etage or '')) }}
+    <div class="lk-koerper">
+      <div class="lk-plan">{{ plan(k.plan2, k.g.etage, k.weg2, k.fiz if k.gleich else none, k.g.melder, planpfad) }}</div>
+      <aside class="lk-rand">
+        <h3>Melder der Gruppe</h3>
+        <table>{% for x in k.g.melder %}<tr><td>{{ nr(k.g.nummer, x.nummer) }}</td><td>{{ typen.get(x.typ, x.typ) }}<br><span>{{ x.ort }}</span></td></tr>{% endfor %}</table>
+        <h3>Zeichen</h3>
+        <ul class="legende"><li><i class="m melder">1</i> automatischer Melder</li><li><i class="m melder hfm">1</i> Handfeuermelder</li><li><i class="linie"></i> Laufweg</li></ul>
+      </aside>
+    </div>
+  </section>
+</article>
+{% endmacro %}
