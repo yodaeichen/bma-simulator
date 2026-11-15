@@ -346,6 +346,7 @@ with TestClient(app, base_url="http://testserver") as c:
         for bild, kopf in (("img/feuer.webp", b"RIFF"), ("img/atemschutz.svg", b"<svg"), ("icons/logo-96.png", b"\x89PNG")):
             assert open(os.path.join(static, bild), "rb").read(4) == kopf and fremd.get(f"/static/{bild}").status_code == 200, bild
         assert "url(/static/img/feuer.webp)" in fremd.get("/static/style.css").text
+        assert "footer.fuss { position:fixed;" in fremd.get("/static/style.css").text and 'class="fz-von"' in anmeldung, "Fußzeile steht fest am Fensterrand"
     assert "/static/icons/logo-96.png" in c.get("/").text
     assert 'id="app-install"' in c.get("/konto").text and "als App installieren" in c.get(f"/objekte/{oid}").text
     assert "Gibt es den Simulator als App" in c.get("/hilfe").text
