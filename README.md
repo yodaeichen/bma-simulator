@@ -68,6 +68,13 @@ Voraussetzungen und Grenzen:
 - Die App der Übenden gehört zur Adresse des Objekts. Nach „Adresse erneuern" die App auf dem Gerät entfernen und
   von der neuen Adresse neu installieren.
 
+## Logo und Erscheinungsbild
+
+Das App-Symbol liegt in `app/static/icons/`, die Bilder des Seitenfußes (Flammen `feuer.webp`, Atemschutzträger
+`atemschutz.svg`) in `app/static/img/`. Wer das Projekt für die eigene Wehr anpasst, tauscht diese Dateien aus;
+die Farben stehen am Ende von `app/static/style.css` unter „Erscheinungsbild". Die Vorlagen für Flammen und
+Zeichnung stammen von der Löschgruppe Eichen.
+
 ## Live-Bild der Übenden
 
 Die Ausbilderansicht zeigt für jede geöffnete Anzeige eine kleine Kachel: den Text, den FAT oder BMZ gerade zeigt,

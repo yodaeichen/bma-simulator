@@ -341,6 +341,12 @@ with TestClient(app, base_url="http://testserver") as c:
         assert fremd.get("/offline").status_code == 200 and "nicht erreichbar" in fremd.get("/offline").text
         anmeldung = fremd.get("/login").text
         assert 'rel="manifest" href="/manifest.webmanifest"' in anmeldung and "/static/app.js" in anmeldung and "apple-touch-icon" in anmeldung
+        # Logo und Seitenfuß mit Flammen und Atemschutzträger; die Anzeigen der Übenden bleiben Geräte an der Wand
+        assert 'class="loginbrand"><img src="/static/icons/icon-192.png"' in anmeldung and '<footer class="fuss">' in anmeldung and "fuss-figur" in anmeldung
+        for bild, kopf in (("img/feuer.webp", b"RIFF"), ("img/atemschutz.svg", b"<svg"), ("icons/logo-96.png", b"\x89PNG")):
+            assert open(os.path.join(static, bild), "rb").read(4) == kopf and fremd.get(f"/static/{bild}").status_code == 200, bild
+        assert "url(/static/img/feuer.webp)" in fremd.get("/static/style.css").text
+    assert "/static/icons/logo-96.png" in c.get("/").text
     assert 'id="app-install"' in c.get("/konto").text and "als App installieren" in c.get(f"/objekte/{oid}").text
     assert "Gibt es den Simulator als App" in c.get("/hilfe").text
 
