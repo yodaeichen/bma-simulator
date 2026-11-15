@@ -778,6 +778,39 @@ def objekt_zu(db: Session, token: str) -> m.Objekt:
     return need(db.scalar(select(m.Objekt).where(m.Objekt.token == token)) if 8 <= len(token) <= 40 else None)
 
 
+# ---------- Als App: Manifest, Service Worker ----------
+
+@app.get("/manifest.webmanifest")
+def manifest():
+    return FileResponse(os.path.join(BASE, "static", "manifest.webmanifest"), media_type="application/manifest+json",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Der Service Worker muss an der Wurzel liegen, damit er für alle Seiten gilt. Die Versionsnummer erneuert seinen Zwischenspeicher."""
+    with open(os.path.join(BASE, "static", "sw.js"), encoding="utf-8") as handle:
+        script = handle.read().replace("__VERSION__", VERSION)
+    return Response(script, media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/offline")
+def offline(request: Request):
+    return templates.TemplateResponse(request, "offline.html", {})
+
+
+@app.get("/a/{token}/manifest.webmanifest")
+def anzeige_manifest(token: str, db: Session = Depends(get_db)):
+    """Eigene App je Objekt für die Geräte der Übenden: startet ohne Anmeldung bei den Anzeigen und läuft im Vollbild."""
+    o = objekt_zu(db, token)
+    icons = [{"src": f"/static/icons/{name}.png", "sizes": f"{size}x{size}", "type": "image/png", "purpose": purpose}
+             for name, size, purpose in (("icon-192", 192, "any"), ("icon-512", 512, "any"), ("icon-maskable-512", 512, "maskable"))]
+    data = {"name": f"{o.name} (Übungsanlage)", "short_name": o.name[:24], "lang": "de", "id": f"/a/{o.token}", "start_url": f"/a/{o.token}",
+            "scope": f"/a/{o.token}", "display": "fullscreen", "display_override": ["fullscreen", "standalone"],
+            "background_color": "#2a2e33", "theme_color": "#1b1e22", "icons": icons}
+    return JSONResponse(data, media_type="application/manifest+json", headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"})
+
+
 def anzeige(request: Request, name: str, o: m.Objekt, **ctx):
     response = templates.TemplateResponse(request, name, {"o": o, "user": None, "flash": None, "csrf": "", **ctx})
     response.headers["Cache-Control"] = "no-store"

@@ -163,6 +163,17 @@ with TestClient(app, base_url="http://testserver") as c:
         for seite, wort in (("", "FAT und FBF"), ("/fat", "Feuerwehr-Bedienfeld"), ("/bmz", "Brandmelderzentrale"), ("/verzeichnis", "0006/02")):
             r = gast.get(f"/a/{token}{seite}")
             assert r.status_code == 200 and wort in r.text and "csrf" not in r.text, seite
+        # Als App: je Objekt ein eigenes Manifest, das ohne Anmeldung bei den Anzeigen startet
+        man = gast.get(f"/a/{token}/manifest.webmanifest")
+        assert man.status_code == 200 and man.headers["content-type"].startswith("application/manifest+json") and man.headers["cache-control"] == "no-store"
+        assert man.json()["start_url"] == f"/a/{token}" and man.json()["start_url"].startswith(man.json()["scope"]) and man.json()["display"] == "fullscreen"
+        assert man.json()["name"].endswith("(Übungsanlage)") and len(man.json()["short_name"]) <= 24
+        assert gast.get("/a/falsch-falsch/manifest.webmanifest").status_code == 404
+        wahl, fat_seite = gast.get(f"/a/{token}").text, gast.get(f"/a/{token}/fat").text
+        for seite in (wahl, fat_seite):
+            assert f'rel="manifest" href="/a/{token}/manifest.webmanifest"' in seite and "/static/app.js" in seite and "data-wach" in seite and 'id="vollbild"' in seite
+            assert "<script>" not in seite, "Skripte nur aus Dateien, sonst sperrt sie die Content-Security-Policy"
+        assert 'id="app-install"' in wahl and 'id="app-install"' not in fat_seite and 'id="ton"' in fat_seite
         d = gast.get(f"/a/{token}/state").json()
         assert "geplant" not in d["st"] and "ansteht" not in d["st"]["meldungen"][0], "nichts für die Übenden Verborgenes"
         assert d["sicht"]["alarme"] == 1 and gast.get(f"/a/{token}/state?v={d['st']['v']}").status_code == 204
@@ -314,6 +325,24 @@ with TestClient(app, base_url="http://testserver") as c:
     live.vergessen(oid)
     assert c.get("/plaene/%d" % fremder_plan).status_code == 200, "Beispielobjekte haben von Anfang an Schemapläne"
     assert c.get("/objekte/1/laufkarten").text.count("vollständig") == 9
+
+    # Als App: Manifest und Service Worker der Ausbilderansicht, Hinweisseite ohne Verbindung
+    static = os.path.join(ROOT, "app", "static")
+    with TestClient(app, base_url="http://testserver") as fremd:
+        man = fremd.get("/manifest.webmanifest")
+        assert man.status_code == 200 and man.headers["content-type"].startswith("application/manifest+json")
+        assert man.json()["display"] == "standalone" and man.json()["start_url"] == "/" and any(i["purpose"] == "maskable" for i in man.json()["icons"])
+        for icon in man.json()["icons"] + [{"src": "/static/icons/apple-touch-icon.png"}, {"src": "/static/icons/favicon-32.png"}]:
+            assert open(os.path.join(static, icon["src"].replace("/static/", "")), "rb").read(8) == b"\x89PNG\r\n\x1a\n", icon
+            assert fremd.get(icon["src"]).status_code == 200
+        sw = fremd.get("/sw.js")
+        assert sw.status_code == 200 and "javascript" in sw.headers["content-type"] and sw.headers["cache-control"] == "no-cache"
+        assert f'VERSION = "{VERSION}"' in sw.text and "__VERSION__" not in sw.text
+        assert fremd.get("/offline").status_code == 200 and "nicht erreichbar" in fremd.get("/offline").text
+        anmeldung = fremd.get("/login").text
+        assert 'rel="manifest" href="/manifest.webmanifest"' in anmeldung and "/static/app.js" in anmeldung and "apple-touch-icon" in anmeldung
+    assert 'id="app-install"' in c.get("/konto").text and "als App installieren" in c.get(f"/objekte/{oid}").text
+    assert "Gibt es den Simulator als App" in c.get("/hilfe").text
 
     # Adresse erneuern, kopieren, löschen
     c.post(f"/objekte/{oid}/link-erneuern", data={"csrf": tok})

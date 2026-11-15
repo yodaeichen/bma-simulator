@@ -2,6 +2,17 @@
 
 Die Versionsnummer steht in `app/version.py` und wird unten auf jeder Seite des Simulators angezeigt.
 
+## 1.3.0
+
+- **Als App auf Handy und Tablet:** Der Simulator lässt sich auf Android, iPhone, iPad und am Rechner installieren
+  (eigenes Symbol, eigenes Fenster, ohne App Store). Die Anleitung für das jeweilige Gerät steht unter „Mein Konto"
+- **Eigene App für die Geräte der Übenden:** Von der Auswahlseite der Anzeigen aus installiert, heißt die App wie das
+  Objekt, startet ohne Anmeldung direkt bei FAT, BMZ und Laufkarten und läuft im Vollbild
+- Auf den Anzeigen bleibt der Bildschirm an, solange sie offen sind; dazu ein Knopf „Vollbild" in der Leiste
+- Ausbilderansicht und Verwaltung für das Handy überarbeitet: Menü als Leiste zum Wischen, Melder als große
+  Schaltflächen in zwei Spalten, größere Eingabefelder, breite Tabellen lassen sich seitlich schieben
+- Hinweisseite „Simulator nicht erreichbar", wenn die App den Server nicht erreicht (z. B. WLAN oder VPN nicht verbunden)
+
 ## 1.2.0
 
 - **Feuerwehr-Laufkarten** je Meldergruppe: Vorderseite mit dem Laufweg von der FIZ durch deren Etage, Rückseite mit der Etage

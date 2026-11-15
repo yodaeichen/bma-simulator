@@ -40,6 +40,34 @@ Bedienteil ohne Vorbild eines bestimmten Herstellers. Der Simulator ersetzt kein
 - **Löschanlage:** Eine ausgelöste Sprinklergruppe setzt „Löschanlage ausgelöst".
 - **Übungsprotokoll:** Jede Auslösung und jede Bedienung mit Uhrzeit und Gerät, als CSV für die Nachbesprechung.
 
+## Als App auf Handy und Tablet (ab Version 1.3)
+
+Der Simulator ist eine installierbare Web-App (PWA). Es gibt keine App im App Store oder bei Google Play: Die App
+wird direkt von der eigenen Adresse des Simulators installiert und kommt mit jeder neuen Version von selbst mit.
+
+| App | Für wen | Installieren von | Verhalten |
+|---|---|---|---|
+| **BMA Simulator** | Ausbilder | einer beliebigen Seite nach der Anmeldung, Anleitung unter „Mein Konto" | eigenes Fenster, Anmeldung wie im Browser |
+| **<Objektname> (Übungsanlage)** | Übende | der Auswahlseite der Anzeigen (`/a/<token>`, QR-Code der Ausbilderansicht) | Vollbild, keine Anmeldung, startet bei FAT, BMZ, Verzeichnis und Laufkarten |
+
+| Gerät | So geht es |
+|---|---|
+| **Android** (Chrome) | Seite öffnen, Menü mit den drei Punkten, „App installieren" |
+| **iPhone / iPad** (Safari) | Seite öffnen, „Teilen", „Zum Home-Bildschirm" |
+| **Rechner** (Chrome, Edge) | Symbol „Installieren" rechts in der Adresszeile |
+
+Auf den Anzeigen hält der Simulator den Bildschirm an, solange sie im Vordergrund offen sind, und die Leiste hat
+einen Knopf „Vollbild" (nicht auf dem iPhone, dort die App installieren).
+
+Voraussetzungen und Grenzen:
+
+- **HTTPS mit gültigem Zertifikat** (z. B. über den Nginx Proxy Manager mit Let's Encrypt). Über `http://` oder mit
+  selbst signiertem Zertifikat gibt es weder Installation noch „Bildschirm bleibt an".
+- Die Geräte müssen den Simulator **erreichen** können (WLAN oder VPN). Die App speichert keine Seiten und keinen
+  Zustand der Anlage auf dem Gerät; ohne Verbindung zeigt sie „Simulator nicht erreichbar".
+- Die App der Übenden gehört zur Adresse des Objekts. Nach „Adresse erneuern" die App auf dem Gerät entfernen und
+  von der neuen Adresse neu installieren.
+
 ## Live-Bild der Übenden
 
 Die Ausbilderansicht zeigt für jede geöffnete Anzeige eine kleine Kachel: den Text, den FAT oder BMZ gerade zeigt,

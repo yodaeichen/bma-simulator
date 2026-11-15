@@ -9,6 +9,24 @@
   <a class="kachel" href="/a/{{ o.token }}/bmz"><strong>BMZ</strong><span>Anzeige- und Bedienteil der Brandmelderzentrale</span></a>
   <a class="kachel" href="/a/{{ o.token }}/verzeichnis"><strong>Meldergruppen</strong><span>Verzeichnis der Gruppen und Melder</span></a>
   <a class="kachel" href="/a/{{ o.token }}/laufkarten"><strong>Laufkarten</strong><span>Feuerwehr-Laufkarten je Meldergruppe: Laufweg ab der FIZ und Lage der Melder</span></a>
+<div class="einbau" id="app-install">
+  <h2>Dieses Gerät als Übungsanlage einrichten</h2>
+  <p class="klein">Als App startet die Übungsanlage im Vollbild ohne Adresszeile, und der Bildschirm bleibt an.</p>
+  <p id="app-installed" hidden>Dieses Gerät läuft als App. Der Bildschirm bleibt an, solange eine Anzeige offen ist.</p>
+  <p id="app-insecure" hidden>Die Installation als App geht nur, wenn der Simulator über HTTPS geöffnet ist (Adresse beginnt mit <code>https://</code>).</p>
+  <div id="app-prompt" hidden>
+    <p>Die Übungsanlage lässt sich auf diesem Gerät als App installieren.</p>
+    <div class="actions"><button type="button" id="app-install-button">App installieren</button></div>
+  </div>
+  <div id="app-ios" hidden>
+    <p>So kommt die Übungsanlage auf den Home-Bildschirm von iPhone oder iPad:</p>
+    <ol class="steps"><li>Diese Seite in <strong>Safari</strong> öffnen.</li><li>Auf <strong>Teilen</strong> tippen (Quadrat mit Pfeil nach oben).</li><li><strong>Zum Home-Bildschirm</strong> wählen und bestätigen.</li></ol>
+  </div>
+  <div id="app-other" hidden>
+    <p>So kommt die Übungsanlage als App auf dieses Gerät:</p>
+    <ol class="steps"><li><strong>Android (Chrome):</strong> Menü mit den drei Punkten, dann „App installieren" oder „Zum Startbildschirm hinzufügen".</li><li><strong>Rechner (Chrome, Edge):</strong> Symbol „Installieren" rechts in der Adresszeile.</li></ol>
+  </div>
+</div>
 </main>
 <script src="/static/praesenz.js?v=2"></script>
 {% endblock %}

@@ -112,3 +112,32 @@ td.detail { font-size:13px; color:var(--muted); max-width:460px; } table.rechte 
 .minilcd.fat { width:calc(20ch + 22px); max-width:100%; } .minilcd.bmz { font-size:9.5px; line-height:1.45; }
 .geraet-live .marken { display:flex; gap:6px; flex-wrap:wrap; } .geraet-live .letzte { font-size:13px; color:#344054; margin-top:6px; }
 .nurlesen .chip { cursor:default; } .nurlesen .chip:hover { border-color:#c9ced8; }
+
+/* Als App und auf dem Handy */
+[hidden] { display:none !important; } p.hint.narrow { max-width:460px; margin:-8px 0 20px; }
+header { padding-top:calc(6px + env(safe-area-inset-top)); padding-left:calc(18px + env(safe-area-inset-left)); padding-right:calc(18px + env(safe-area-inset-right)); }
+footer { padding-bottom:env(safe-area-inset-bottom); }
+@media (max-width:760px) {
+  body { font-size:16px; }
+  /* Kopfzeile: Marke und Abmelden oben, das Menü darunter als Leiste zum Wischen */
+  header { gap:6px 10px; padding-bottom:0; }
+  header a.brand { flex:1; order:1; margin-right:0; } header a.sponsor { display:none; } header form { order:2; }
+  header nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; gap:0; margin:0 -18px; padding:0 10px; }
+  header nav::-webkit-scrollbar { display:none; }
+  header nav a { padding:11px 9px; white-space:nowrap; }
+  main { margin:16px auto; padding:0 12px; } .card { padding:14px; margin-bottom:14px; }
+  /* Eingabefelder mit 16 Pixeln, sonst zoomt das iPhone beim Antippen hinein */
+  input[type=text],input[type=password],input[type=number],input[type=file],select,textarea { font-size:16px; padding:10px; }
+  button,.btn { padding:11px 16px; } button.klein,.btn.klein { padding:8px 12px; font-size:14px; } header button { padding:6px 10px; font-size:14px; }
+  button.link { padding:8px 0; } ul.meldungen .tun button { padding:6px 0; font-size:14px; }
+  .actions { flex-wrap:wrap; } label.check { padding:5px 0; } label.check input { width:20px; height:20px; flex:none; }
+  /* Breite Tabellen lassen sich in ihrer Karte seitlich schieben, statt die Seite zu sprengen */
+  .card:has(> table), .card:has(> form > table) { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .tiles { grid-template-columns:1fr; } .login { margin:32px auto; } form.pw input { width:100%; }
+  /* Ausbilderansicht: Melder als zwei gleich breite Spalten, gut mit dem Daumen zu treffen */
+  .chips { display:grid; grid-template-columns:1fr 1fr; } .chip { min-width:0; max-width:none; min-height:54px; padding:8px 10px; }
+  .modus label { padding:9px 12px; } nav.etagen button { padding:8px 14px; }
+  .optionen { gap:10px 16px; } .optionen input[type=number] { width:84px; }
+  .linkzeile { flex-wrap:wrap; } ol.protokoll { max-height:260px; }
+  .minilcd.bmz { font-size:8px; }
+}

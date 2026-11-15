@@ -12,4 +12,22 @@
     <div class="actions"><button>Ändern</button></div>
   </form>
 </div>
+<div class="card narrow" id="app-install">
+  <h2>Als App auf Handy und Tablet</h2>
+  <p id="app-installed" hidden><span class="tag gesendet">Installiert</span> Du benutzt den Simulator gerade als App.</p>
+  <p id="app-insecure" hidden>Die Installation als App geht nur, wenn der Simulator über HTTPS geöffnet ist (Adresse beginnt mit <code>https://</code>).</p>
+  <div id="app-prompt" hidden>
+    <p>Der Simulator lässt sich wie eine App auf diesem Gerät installieren: eigenes Symbol, eigenes Fenster, keine Adresszeile.</p>
+    <div class="actions"><button type="button" id="app-install-button">App installieren</button></div>
+  </div>
+  <div id="app-ios" hidden>
+    <p>So kommt der Simulator auf den Home-Bildschirm von iPhone oder iPad:</p>
+    <ol class="steps"><li>Diese Seite in <strong>Safari</strong> öffnen.</li><li>Auf <strong>Teilen</strong> tippen (Quadrat mit Pfeil nach oben).</li><li><strong>Zum Home-Bildschirm</strong> wählen und bestätigen.</li></ol>
+  </div>
+  <div id="app-other" hidden>
+    <p>So kommt der Simulator als App auf dieses Gerät:</p>
+    <ol class="steps"><li><strong>Android (Chrome):</strong> Menü mit den drei Punkten, dann „App installieren" oder „Zum Startbildschirm hinzufügen".</li><li><strong>Rechner (Chrome, Edge):</strong> Symbol „Installieren" rechts in der Adresszeile.</li></ol>
+  </div>
+</div>
+<p class="hint narrow">Das ist die App für Ausbilder. Die Geräte der Übenden bekommen ihre eigene App: dort die Adresse der Anzeigen öffnen (QR-Code in der Ausbilderansicht) und auf der Auswahlseite „Als App installieren" folgen.</p>
 {% endblock %}

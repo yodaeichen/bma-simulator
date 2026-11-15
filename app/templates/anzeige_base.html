@@ -2,23 +2,33 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1e22">
+<link rel="manifest" href="/a/{{ o.token }}/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ o.name }}">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="robots" content="noindex">
 <title>{% block title %}{{ o.name }}{% endblock %}</title>
-<link rel="stylesheet" href="/static/anzeige.css?v=2">
+<link rel="stylesheet" href="/static/anzeige.css?v=3">
 {% if self.bodyclass() == 'seite-laufkarten' %}<link rel="stylesheet" href="/static/laufkarte.css?v=2">{% endif %}
 </head>
-<body class="{% block bodyclass %}{% endblock %}">
+<body class="{% block bodyclass %}{% endblock %}" data-wach>
 <div class="leiste">
   <strong>{{ o.name }}</strong>
   <nav><a href="/a/{{ o.token }}/fat"{% if self.bodyclass() == 'seite-fat' %} aria-current="page"{% endif %}>FAT und FBF</a>
     <a href="/a/{{ o.token }}/bmz"{% if self.bodyclass() == 'seite-bmz' %} aria-current="page"{% endif %}>BMZ</a>
     <a href="/a/{{ o.token }}/verzeichnis"{% if self.bodyclass() == 'seite-verzeichnis' %} aria-current="page"{% endif %}>Meldergruppen</a>
     <a href="/a/{{ o.token }}/laufkarten"{% if self.bodyclass() == 'seite-laufkarten' %} aria-current="page"{% endif %}>Laufkarten</a></nav>
-  {% block leiste %}<button type="button" id="ton" aria-pressed="false">Ton ein</button>{% endblock %}
+  <span class="knoepfe"><button type="button" id="vollbild" aria-pressed="false" hidden>Vollbild</button>
+  {% block leiste %}<button type="button" id="ton" aria-pressed="false">Ton ein</button>{% endblock %}</span>
 </div>
 <div class="offline" id="offline" hidden>Keine Verbindung zur Anlage</div>
 {% block content %}{% endblock %}
 <p class="fuss">Übungsanlage &middot; BMA Simulator {{ version }}</p>
+<script src="/static/app.js?v=1" defer></script>
 </body>
 </html>
