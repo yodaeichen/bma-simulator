@@ -268,3 +268,14 @@ SECRET_KEY=$(openssl rand -hex 32) ADMIN_PASSWORD=ein-langes-passwort COOKIE_SEC
 ```
 
 Der Dienst läuft bewusst als ein einzelner Prozess; die Anzeigen fragen den Zustand im Sekundentakt ab.
+
+## Lizenz
+
+Der Code steht unter der [MIT-Lizenz](LICENSE): Jeder darf ihn verwenden, ändern und weitergeben, auch in eigenen
+Fassungen, solange der Lizenzhinweis erhalten bleibt.
+
+**Ausgenommen** sind das Logo und die Bilder in `app/static/icons/`, `app/static/img/feuer.webp` und
+`app/static/img/atemschutz.svg`. Alle Rechte daran liegen bei yodaeichen; wer den Simulator weitergibt oder eine eigene
+Fassung betreibt, ersetzt sie durch eigene.
+
+Die Töne in `app/static/ton/` stammen aus safetydaysBMA und stehen unter deren MIT-Lizenz (siehe Abschnitt „Dank“).

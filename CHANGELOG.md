@@ -2,6 +2,11 @@
 
 Die Versionsnummer steht in `app/version.py` und wird unten auf jeder Seite des Simulators angezeigt.
 
+## 1.5.1
+
+- **Lizenz:** Der Code steht jetzt unter der MIT-Lizenz (Datei `LICENSE`). Logo und Bilder (`app/static/icons/`,
+  `app/static/img/`) sind davon ausgenommen und bleiben vorbehalten
+
 ## 1.5.0
 
 Verbesserungen nach dem Vorbild des BMA-Simulators safetydaysBMA (safety days 2019, Institut der Feuerwehr NRW):
