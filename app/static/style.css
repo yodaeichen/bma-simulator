@@ -191,3 +191,9 @@ nav.etagen b { background:var(--alarm); } .chip.alarm { background:var(--alarm);
 ul.meldungen li { border-left-color:var(--alarm); } .tile.alarm { border-left-color:var(--alarm); }
 .modus label { background:#f1ede7; } nav.etagen button.on, .modus label:has(input:checked) { background:var(--ink); border-color:var(--ink); }
 .gruppe.ab { background:#efebe5; } .chip { background:#faf8f5; } table.melderliste tr.gruppe td { background:#f6f2ec; }
+/* Szenarien */
+table.ablauf td:first-child { width:70px; font-variant-numeric:tabular-nums; color:var(--muted); }
+table.schritte td { padding:6px; } table.schritte input[type=number] { width:90px; } table.schritte select, table.schritte input { min-width:0; }
+table.schritte td:nth-child(3) select { min-width:240px; } table.schritte [disabled] { opacity:.4; }
+.szenario-start { display:flex; gap:8px; flex-wrap:wrap; align-items:center; } .szenario-start select { flex:1; min-width:180px; width:auto; }
+.sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }

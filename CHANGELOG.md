@@ -2,6 +2,29 @@
 
 Die Versionsnummer steht in `app/version.py` und wird unten auf jeder Seite des Simulators angezeigt.
 
+## 1.5.0
+
+Verbesserungen nach dem Vorbild des BMA-Simulators safetydaysBMA (safety days 2019, Institut der Feuerwehr NRW):
+
+- **FAT und FBF neu gezeichnet** im Aufbau nach DIN 14662 und DIN 14661: roter Rahmen, dunkle Front, weiße Beschriftung.
+  Das FAT bezeichnet die Zeilen „erste Meldung" und „letzte Meldung", das FBF ordnet seine acht Felder in zwei Spalten
+  wie am Gerät an, mit Leuchttasten für „Akustische Signale ab", „Brandfall-Steuerung ab", „ÜE ab" und „BMZ rückstellen"
+- **„ÜE Nr. … prüfen"** zeigt die Nummer der Übertragungseinrichtung (die BMA-Nummer des Objekts)
+- **„BMZ rückstellen"** leuchtet rot, solange die BMZ im Brandmeldezustand ist
+- **Anzeigetest:** „Summer ab" länger als 5 Sekunden gedrückt halten schaltet alle Leuchten, die Anzeige und den Summer an
+- **Historie:** „Anzeigeebene" länger als 5 Sekunden gedrückt halten zeigt alle Meldungen seit Übungsbeginn mit Uhrzeit,
+  auch die rückgestellten; die Grundstellung leert sie
+- Ohne Bedienung kehrt das FAT nach 20 Sekunden zur ersten und letzten Meldung zurück
+- „Störung" und „Abschaltung" blinken am FAT, bis die neue Meldung auf ihrer Ebene angesehen wurde
+- **Brandfallsteuerungen** lassen sich nur abschalten, solange die BMA nicht im Brandmeldezustand ist; der Versuch steht im Protokoll
+- **Töne:** echter Summerton und ein Hausalarm, der läuft, bis die Übenden „Akustische Signale ab" drücken.
+  Beide getrennt einschaltbar („Summer-Ton ein", „Hausalarm ein"); die Töne stammen aus safetydaysBMA (MIT-Lizenz)
+- **Erklärmodus** auf dem Gerät der Übenden: Tippen auf ein Bedienelement von FAT oder FBF erklärt es, statt es auszulösen
+- **Szenarien:** vorbereitete Übungsabläufe je Objekt aus Alarmen, Störungen, Abschaltungen und Löschanlage mit festem
+  Zeitpunkt, mit einem Klick in der Übung gestartet. Die Beispielobjekte bekommen vier Beispielszenarien, auch bei
+  bestehenden Installationen, sofern sie noch keine Szenarien haben
+- Das Live-Bild zeigt zusätzlich, ob Hausalarm oder Erklärmodus an sind und ob die Historie offen ist
+
 ## 1.4.1
 
 - **Fester Rahmen:** Die Kopfzeile bleibt oben, Flammen und Fußzeile mit der Versionsnummer bleiben unten am

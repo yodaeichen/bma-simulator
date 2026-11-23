@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Szenario · {{ o.name }}{% endblock %}
+{% block mainattr %} class="breit"{% endblock %}
+{% block content %}
+<h1>{{ "Szenario bearbeiten" if sz else "Neues Szenario" }}: {{ o.name }}</h1>
+<form method="post" action="/objekte/{{ o.id }}/szenarien/speichern" id="sz-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ sz.id if sz else '' }}">
+  <div class="card">
+    <div class="grid">
+      <div><label for="name">Name</label><input type="text" id="name" name="name" maxlength="120" value="{{ sz.name if sz else '' }}" required></div>
+      <div><label for="beschreibung">Beschreibung für den Ausbilder</label><input type="text" id="beschreibung" name="beschreibung" maxlength="1000" value="{{ sz.beschreibung if sz else '' }}"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Ablauf</h2>
+    <p class="hint">Die Zeit zählt ab dem Start des Szenarios. Die Schritte werden nach Zeit sortiert gespeichert.
+      „Ganze Gruppe“ gibt es nur bei Abschaltungen, „Anlage“ nur bei Störungen. Eine Abschaltung schaltet ab oder, wenn schon abgeschaltet, wieder ein.</p>
+    <table class="schritte" id="schritte">
+      <thead><tr><th>Zeit (s)</th><th>Was</th><th>Wo</th><th>Text der Störung</th><th>Ursache</th><th></th></tr></thead>
+      <tbody>
+      {% for z in zeilen %}
+      <tr>
+        <td><input type="number" name="sek" min="0" max="3600" value="{{ z.sek }}" aria-label="Zeit in Sekunden" required></td>
+        <td><select name="aktion" aria-label="Art des Schritts">{% for k, n in aktionen.items() %}<option value="{{ k }}" {{ 'selected' if z.aktion == k }}>{{ n }}</option>{% endfor %}</select></td>
+        <td><select name="ziel" aria-label="Melder oder Gruppe">
+          <option value="0/0" {{ 'selected' if not z.g }}>Anlage (ohne Melder)</option>
+          {% for g in o.gruppen %}<optgroup label="{{ nr(g.nummer) }} {{ g.name }} ({{ g.etage }})">
+            <option value="{{ g.nummer }}/0" {{ 'selected' if z.g == g.nummer and not z.m }}>{{ nr(g.nummer) }} ganze Gruppe</option>
+            {% for x in g.melder %}<option value="{{ g.nummer }}/{{ x.nummer }}" {{ 'selected' if z.g == g.nummer and z.m == x.nummer }}>{{ nr(g.nummer, x.nummer) }} {{ x.ort }}</option>{% endfor %}
+          </optgroup>{% endfor %}
+        </select></td>
+        <td><input type="text" name="text" maxlength="60" value="{{ z.text }}" aria-label="Text der Störung" placeholder="z. B. Melder verschmutzt"></td>
+        <td><select name="ansteht" aria-label="Ursache steht an"><option value="0">beseitigt</option><option value="1" {{ 'selected' if z.ansteht }}>steht an</option></select></td>
+        <td class="r"><button type="button" class="link" data-weg>Entfernen</button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="actions"><button type="button" class="light" id="sz-plus">Schritt hinzufügen</button></div>
+    <p class="hint">„Ursache steht an“ gilt nur für Alarme: Der Melder löst nach dem Rückstellen erneut aus, bis die Ursache in der Übung als beseitigt markiert wird.</p>
+  </div>
+  <div class="actions"><button>Speichern</button><a class="btn light" href="/objekte/{{ o.id }}/szenarien">Abbrechen</a></div>
+</form>
+<script src="/static/szenario_edit.js?v=1"></script>
+{% endblock %}

@@ -4,43 +4,61 @@
 {% block content %}
 <main class="wand" id="anzeige" data-token="{{ o.token }}" data-name="{{ o.name }}" data-nr="{{ o.bma_nr }}">
 
-  <section class="geraet fat" aria-label="Feuerwehr-Anzeigetableau">
+  {# Feuerwehr-Anzeigetableau, Aufbau angelehnt an DIN 14662 #}
+  <section class="geraet din fat" aria-label="Feuerwehr-Anzeigetableau">
     <h1>Feuerwehr-Anzeigetableau</h1>
-    <div class="fat-innen">
-      <div class="fat-leds">
-        <div><i class="led gruen an"></i>Betrieb</div>
+    <div class="fat-oben">
+      <div class="fat-zeilen" aria-hidden="true">
+        <span data-erkl="erste">erste<br>Meldung</span>
+        <span data-erkl="letzte">letzte<br>Meldung</span>
+      </div>
+      <div class="fat-display">
+        <div class="fat-ueber" id="fat-ueber">Meldergruppe / Melder</div>
+        <div class="lcd-rahmen" data-erkl="erste"><pre class="lcd lcd-fat" id="fat-lcd" aria-live="polite" aria-label="Anzeige des FAT"></pre></div>
+      </div>
+    </div>
+    <div class="fat-bedien">
+      <div class="spalte blaettern" data-erkl="weitere">
+        <button type="button" class="leucht gelb" id="fat-auf" data-led="weitere" aria-label="Weitere Meldungen: zurück">▲</button>
+        <span>weitere Meldungen</span>
+        <button type="button" class="leucht gelb" id="fat-ab" data-led="weitere" aria-label="Weitere Meldungen: vor">▼</button>
+      </div>
+      <div class="spalte tastenspalte">
+        <div class="tz" data-erkl="ebene"><button type="button" class="din-taste" id="fat-ebene" aria-label="Anzeigeebene"></button>
+          <span>Anzeigeebene<small>&gt; 5 s: Historie</small></span></div>
+        <div class="tz" data-erkl="summer"><button type="button" class="din-taste" id="fat-summer" aria-label="Summer ab"></button>
+          <span>Summer ab<small>&gt; 5 s: Test</small></span></div>
+      </div>
+      <div class="spalte ledspalte" data-erkl="fat-leds">
+        <div><i class="led gruen an" data-led="betrieb"></i>Betrieb</div>
         <div><i class="led rot" data-led="alarm"></i>Alarm</div>
         <div><i class="led gelb" data-led="stoerung"></i>Störung</div>
         <div><i class="led gelb" data-led="abschaltung"></i>Abschaltung</div>
       </div>
-      <div class="lcd-rahmen"><pre class="lcd lcd-fat" id="fat-lcd" aria-live="polite" aria-label="Anzeige des FAT"></pre></div>
-      <div class="fat-tasten">
-        <button type="button" class="taste" id="fat-auf" aria-label="Vorherige Meldung">▲</button>
-        <div class="weitere"><i class="led gelb" data-led="weitere"></i>weitere<br>Meldungen</div>
-        <button type="button" class="taste" id="fat-ab" aria-label="Nächste Meldung">▼</button>
-      </div>
-    </div>
-    <div class="fat-unten">
-      <button type="button" class="taste breit" id="fat-ebene">Anzeigeebene</button>
-      <span class="ebene" id="fat-ebene-name">Alarm</span>
-      <button type="button" class="taste breit" data-geraet="fat" data-aktion="summer_ab">Summer ab</button>
     </div>
   </section>
 
-  <section class="geraet fbf zu" id="fbf" aria-label="Feuerwehr-Bedienfeld">
+  {# Feuerwehr-Bedienfeld, Aufbau angelehnt an DIN 14661 #}
+  <section class="geraet din fbf zu" id="fbf" aria-label="Feuerwehr-Bedienfeld">
     <h1>Feuerwehr-Bedienfeld</h1>
-    <div class="fbf-feld">
-      <div class="z"><i class="led gruen an"></i><span class="schild">Betrieb</span><span></span></div>
-      <div class="z"><i class="led rot" data-led="ue"></i><span class="schild rot">ÜE ausgelöst</span><span></span></div>
-      <div class="z"><i class="led rot" data-led="loesch"></i><span class="schild rot">Löschanlage ausgelöst</span><span></span></div>
-      <div class="z"><i class="led gelb" data-led="bfs_ab"></i><span class="schild gelb">Brandfall-Steuerungen ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="bfs_ab" aria-label="Brandfall-Steuerungen ab"></button></div>
-      <div class="z"><i class="led gelb" data-led="akustik_ab"></i><span class="schild gelb">Akustische Signale ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="akustik_ab" aria-label="Akustische Signale ab"></button></div>
-      <div class="z"><i class="led gelb" data-led="ue_ab"></i><span class="schild gelb">ÜE ab</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ue_ab" aria-label="ÜE ab"></button></div>
-      <div class="z"><i></i><span class="schild">ÜE prüfen</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ue_pruefen" aria-label="ÜE prüfen"></button></div>
-      <div class="z"><i></i><span class="schild">BMZ rückstellen</span><button type="button" class="taste" data-geraet="fbf" data-aktion="ruecksetzen" aria-label="BMZ rückstellen"></button></div>
+    <div class="fbf-raster">
+      <div class="zelle" data-erkl="fbf-betrieb"><i class="led gruen an"></i><span>Bedienfeld<br>in Betrieb</span></div>
+      <div class="zelle" data-erkl="ue"><i class="led rot" data-led="ue"></i><span>ÜE<br>ausgelöst</span></div>
+      <div class="zelle" data-erkl="loesch"><i class="led rot" data-led="loesch"></i><span>Löschanlage<br>ausgelöst</span></div>
+      <div class="zelle" data-erkl="bfs_ab"><button type="button" class="leucht gelb" data-led="bfs_ab" data-geraet="fbf" data-aktion="bfs_ab" aria-label="Brandfall-Steuerung ab"></button><span>Brandfall-<br>Steuerung ab</span></div>
+      <div class="zelle" data-erkl="akustik_ab"><button type="button" class="leucht gelb" data-led="akustik_ab" data-geraet="fbf" data-aktion="akustik_ab" aria-label="Akustische Signale ab"></button><span>Akustische<br>Signale ab</span></div>
+      <div class="zelle" data-erkl="rueck"><button type="button" class="leucht rot" data-led="brand" data-geraet="fbf" data-aktion="ruecksetzen" aria-label="BMZ rückstellen"></button><span>BMZ<br>rückstellen</span></div>
+      <div class="zelle" data-erkl="ue_ab"><button type="button" class="leucht gelb" data-led="ue_ab" data-geraet="fbf" data-aktion="ue_ab" aria-label="ÜE ab"></button><span>ÜE ab</span></div>
+      <div class="zelle" data-erkl="ue_pruefen"><button type="button" class="din-taste" data-geraet="fbf" data-aktion="ue_pruefen" aria-label="ÜE prüfen"></button>
+        <span>ÜE Nr.<b class="ue-nr">{{ o.bma_nr or "–" }}</b>prüfen</span></div>
     </div>
-    <button type="button" class="schloss" id="fbf-schloss" aria-pressed="false"><i></i><span>Mit Feuerwehrschlüssel aufschließen</span></button>
+    <button type="button" class="schloss" id="fbf-schloss" aria-pressed="false" data-erkl="schloss"><i></i><span>Mit Feuerwehrschlüssel aufschließen</span></button>
   </section>
 </main>
-<script src="/static/anzeige.js?v=2"></script>
+
+<div class="erklaerung" id="erklaerung" role="dialog" aria-modal="false" aria-labelledby="erkl-titel" hidden>
+  <div><h2 id="erkl-titel"></h2><p id="erkl-text"></p></div>
+  <button type="button" id="erkl-zu">Schließen</button>
+</div>
+<script src="/static/anzeige.js?v=3"></script>
 {% endblock %}

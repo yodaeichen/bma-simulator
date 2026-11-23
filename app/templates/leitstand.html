@@ -5,7 +5,7 @@
 <div class="row">
   <div><h1>{{ o.name }} <span class="tag" id="lage">…</span></h1>
     <p class="hint">{{ "Ausbilderansicht" if perm.uebung == 2 else "Ausbilderansicht, nur zum Zusehen" }}{% if o.bma_nr %} &middot; {{ o.bma_nr }}{% endif %}{% if o.adresse %} &middot; {{ o.adresse }}{% endif %}</p></div>
-  <div><a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Laufkarten</a> <a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a>{% if perm.objekte == 2 %} <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div>
+  <div><a class="btn light" href="/objekte/{{ o.id }}/szenarien">Szenarien</a> <a class="btn light" href="/objekte/{{ o.id }}/laufkarten">Laufkarten</a> <a class="btn light" href="/objekte/{{ o.id }}/melder">Melderliste</a>{% if perm.objekte == 2 %} <a class="btn light" href="/objekte/{{ o.id }}/bearbeiten">Objekt bearbeiten</a>{% endif %}</div>
 </div>
 {% if o.hinweis %}<div class="flash note">{{ o.hinweis }}</div>{% endif %}
 <div class="flash err" id="offline" hidden>Keine Verbindung zum Server. Die Ansicht aktualisiert sich, sobald er wieder erreichbar ist.</div>
@@ -25,6 +25,12 @@
         <label for="sekunden">Verzögerung <input type="number" id="sekunden" min="0" max="3600" value="0"> s</label>
         <label for="ausbreitung">Ausbreitung alle <input type="number" id="ausbreitung" min="0" max="600" value="0"> s</label>
         <label class="check"><input type="checkbox" id="ansteht"> Ursache steht an</label>
+      </div>
+      <div class="szenario-start">
+        {% if o.szenarien %}<label for="szenario-wahl" class="sr">Szenario</label>
+        <select id="szenario-wahl">{% for sz in o.szenarien %}<option value="{{ sz.id }}">{{ sz.name }}</option>{% endfor %}</select>
+        <button type="button" data-aktion="szenario">Szenario starten</button>{% else %}<span class="hint">Noch kein Szenario für dieses Objekt.</span>{% endif %}
+        <a class="btn light klein" href="/objekte/{{ o.id }}/szenarien">Szenarien verwalten</a>
       </div>
       <p class="hint">Ausbreitung: Nach dem ersten Melder sprechen bis zu vier weitere automatische Melder derselben Gruppe und Etage an.
         „Ursache steht an“: Der Melder löst nach dem Rückstellen erneut aus, bis die Ursache hier als beseitigt markiert wird.</p>
@@ -128,5 +134,5 @@
   </aside>
 </div>
 <script src="/static/frage.js?v=1"></script>
-<script src="/static/leitstand.js?v=3"></script>
+<script src="/static/leitstand.js?v=4"></script>
 {% endblock %}

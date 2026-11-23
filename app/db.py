@@ -72,6 +72,8 @@ class Objekt(Base):
     gruppen: Mapped[list["Gruppe"]] = relationship(back_populates="objekt", cascade="all, delete-orphan",
                                                     order_by="Gruppe.nummer")
     plaene: Mapped[list["Plan"]] = relationship(back_populates="objekt", cascade="all, delete-orphan")
+    szenarien: Mapped[list["Szenario"]] = relationship(back_populates="objekt", cascade="all, delete-orphan",
+                                                       order_by="Szenario.name")
     protokoll: Mapped[list["Protokoll"]] = relationship(cascade="all, delete-orphan")
 
 
@@ -105,6 +107,19 @@ class Melder(Base):
     px: Mapped[float | None] = mapped_column(Float, nullable=True)  # Lage im Plan der Etage (0 bis 1)
     py: Mapped[float | None] = mapped_column(Float, nullable=True)
     gruppe: Mapped[Gruppe] = relationship(back_populates="melder")
+
+
+class Szenario(Base):
+    """Vorbereiteter Übungsablauf: Schritte mit Zeitpunkt, Art und Melder (siehe szenario.py)."""
+    __tablename__ = "szenarien"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objekt_id: Mapped[int] = mapped_column(ForeignKey("objekte.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    beschreibung: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # Schritte als JSON: [{"sek", "aktion", "g", "m", "text", "ansteht"}]; Melder über Gruppen- und Meldernummer,
+    # damit ein Szenario das Kopieren des Objekts und das Neueinlesen der Melderliste übersteht
+    schritte: Mapped[str] = mapped_column(Text, default="[]", server_default="[]")
+    objekt: Mapped[Objekt] = relationship(back_populates="szenarien")
 
 
 class Plan(Base):

@@ -103,3 +103,72 @@ button:focus-visible, a:focus-visible { outline:3px solid #6cb2ff; outline-offse
   .leiste nav { order:3; flex:0 0 100%; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; gap:18px; }
   .leiste nav::-webkit-scrollbar { display:none; } .leiste nav a { padding:10px 0 8px; white-space:nowrap; }
 }
+/* ---------- FAT und FBF im Aufbau nach DIN 14662 / DIN 14661: roter Rahmen, dunkle Front, weiße Schrift ---------- */
+.geraet.din { --rahmen:#d0101f; background:#141518; color:#f2f3f4; border:10px solid var(--rahmen); border-radius:22px; padding:16px 20px 20px;
+  box-shadow:0 0 0 2px #7a0a14, 0 16px 34px rgba(0,0,0,.55); }
+.geraet.din h1 { color:#fff; font-size:clamp(20px, 2.6vw, 30px); font-weight:600; letter-spacing:.3px; text-transform:none; text-align:center; margin:4px 0 14px; }
+.din .led { box-shadow:none; border-color:#000; } .din .led.rot { background:#4a1418; } .din .led.gelb { background:#4a3f10; } .din .led.gruen { background:#163d1f; }
+.din .led.rot.an { background:#ff2b3d; box-shadow:0 0 12px 3px rgba(255,43,61,.8); }
+.din .led.gelb.an { background:#ffd000; box-shadow:0 0 12px 3px rgba(255,208,0,.7); }
+.din .led.gruen.an { background:#33e063; box-shadow:0 0 10px 2px rgba(51,224,99,.7); }
+@media (prefers-reduced-motion:no-preference){
+  .din .led.blinkt.an, .leucht.blinkt.an { animation:din-blink 1s steps(1) infinite; }
+}
+@keyframes din-blink { 50% { filter:brightness(.35); box-shadow:none; } }
+
+/* Tasten: quadratisch, hell; Leuchttasten leuchten selbst */
+.din-taste, .leucht { width:58px; height:58px; flex:none; border-radius:6px; border:2px solid #9aa0a6; background:linear-gradient(#f4f5f5, #cfd2d5);
+  color:#1b1e22; font:700 22px/1 system-ui, sans-serif; cursor:pointer; box-shadow:0 3px 0 #5b6067; }
+.din-taste:active, .leucht:active, .din-taste.gedrueckt { transform:translateY(2px); box-shadow:0 1px 0 #5b6067; }
+.leucht.gelb.an { background:radial-gradient(circle at 50% 45%, #fff6b0, #ffd000 70%); border-color:#a68800; box-shadow:0 3px 0 #7a6400, 0 0 16px 3px rgba(255,208,0,.65); }
+.leucht.rot.an { background:radial-gradient(circle at 50% 45%, #ffb3ba, #ff2b3d 70%); border-color:#8f0b20; color:#fff; box-shadow:0 3px 0 #6a0816, 0 0 16px 3px rgba(255,43,61,.7); }
+
+/* FAT */
+.fat.din { width:min(620px, 100%); }
+.fat-oben { display:grid; grid-template-columns:96px 1fr; gap:10px; align-items:end; padding-bottom:16px; }
+.fat-zeilen { display:flex; flex-direction:column; justify-content:space-around; height:calc(4 * 1.45 * clamp(15px, 3.2vw, 25px) + 22px); font-size:14px; line-height:1.15;
+  border-right:0; position:relative; }
+.fat-zeilen span:first-child { border-bottom:2px solid #d9dbde; padding-bottom:8px; }
+.fat-ueber { font-size:14px; margin:0 0 6px 8px; color:#f2f3f4; }
+.din .lcd-rahmen { background:#0b0c0d; padding:6px; border-radius:6px; }
+.din .lcd { background:#6aa339; color:#0f2208; border-radius:6px; }
+.din .lcd-fat { font-size:clamp(15px, 3.2vw, 25px); }
+.din .lcd.voll { background:#1d3a0c; color:transparent; }  /* Anzeigetest: alle Bildpunkte an */
+.fat-display { min-width:0; }
+.fat-bedien { display:grid; grid-template-columns:1.25fr 1.1fr 1fr; border-top:2px solid #d9dbde; }
+.fat-bedien .spalte { padding:14px 10px 4px; display:flex; flex-direction:column; gap:12px; }
+.fat-bedien .spalte + .spalte { border-left:2px solid #d9dbde; }
+.blaettern { align-items:center; justify-content:space-between; } .blaettern span { font-size:15px; text-align:center; }
+.tastenspalte .tz { display:flex; align-items:center; gap:12px; } .tastenspalte span { font-size:15px; line-height:1.2; }
+.tastenspalte small { display:block; font-size:12.5px; color:#c4c8cd; margin-top:3px; }
+.ledspalte { justify-content:space-around; font-size:15px; } .ledspalte div { display:flex; align-items:center; gap:12px; } .ledspalte .led { width:22px; height:22px; }
+
+/* FBF */
+.fbf.din { width:min(560px, 100%); }
+.fbf-raster { display:grid; grid-template-columns:1fr 1fr; border-top:2px solid #d9dbde; }
+.fbf-raster .zelle { display:flex; align-items:center; gap:14px; padding:14px 12px; min-height:92px; border-bottom:2px solid #d9dbde; font-size:16px; line-height:1.2; }
+.fbf-raster .zelle:nth-child(odd) { border-right:2px solid #d9dbde; } .fbf-raster .zelle:nth-last-child(-n+2) { border-bottom:0; }
+.fbf-raster .led { width:24px; height:24px; margin:0 17px; }
+.ue-nr { display:block; background:#fff; color:#111; font:700 15px/1.2 "DejaVu Sans Mono", Consolas, monospace; text-align:center; padding:2px 8px; margin:4px 0; border-radius:2px; min-width:90px; }
+.fbf.din .schloss { color:#e8eaed; border-color:#6b7178; }
+.fbf.din.zu .fbf-raster button { opacity:.55; }
+.fbf.din .schloss[aria-pressed=true] { border-color:#33e063; }
+
+/* Erklärmodus */
+.erklaermodus [data-erkl] { cursor:help; outline:2px dashed rgba(108,178,255,.55); outline-offset:3px; }
+.erklaerung { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); width:min(640px, calc(100% - 32px)); background:#f4f5f5; color:#1b1e22;
+  border-radius:10px; border-top:6px solid #d0101f; padding:14px 16px; box-shadow:0 12px 30px rgba(0,0,0,.6); display:flex; gap:14px; align-items:flex-start; z-index:10; }
+.erklaerung[hidden] { display:none; }
+.erklaerung h2 { margin:0 0 6px; font-size:17px; } .erklaerung p { margin:0; font-size:15px; line-height:1.45; }
+.erklaerung button { background:#1b1e22; color:#fff; border:0; border-radius:6px; padding:6px 12px; font:inherit; cursor:pointer; flex:none; }
+
+@media (max-width:640px){
+  .geraet.din { border-width:7px; padding:12px; border-radius:16px; }
+  .fat-oben { grid-template-columns:64px 1fr; } .fat-zeilen { font-size:12px; }
+  .fat-bedien { grid-template-columns:1fr 1fr; } .fat-bedien .ledspalte { grid-column:1 / 3; border-left:0; border-top:2px solid #d9dbde; flex-direction:row; flex-wrap:wrap; gap:10px 18px; }
+  .din-taste, .leucht { width:50px; height:50px; } .fbf-raster .zelle { font-size:14px; gap:10px; padding:10px 8px; min-height:80px; } .fbf-raster .led { margin:0 13px; }
+}
+/* Schmale Geräte: Mit Summer, Hausalarm und Erklären passen die Knöpfe nicht neben den Namen; sie bekommen eine eigene Zeile */
+@media (max-width:700px) {
+  .leiste strong { flex:1 1 100%; } .leiste .knoepfe { flex-wrap:wrap; gap:6px; } .leiste button { padding:6px 10px; }
+}

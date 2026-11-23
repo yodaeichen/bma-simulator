@@ -16,7 +16,7 @@ from .db import utcnow
 TIMEOUT = 6
 MAX_GERAETE = 20
 GERAETE = {"fat": "FAT und FBF", "bmz": "BMZ", "verz": "Meldergruppenverzeichnis", "wahl": "Auswahlseite", "lauf": "Laufkarten"}
-EBENEN = ("alarm", "stoerung", "abschaltung")
+EBENEN = ("alarm", "stoerung", "abschaltung", "historie")
 _ID = re.compile(r"^[A-Za-z0-9]{4,16}$")
 _lock = threading.Lock()
 _geraete: dict[int, dict[str, dict]] = {}
@@ -41,6 +41,8 @@ def melden(objekt_id: int, q) -> None:
         eintrag["ebene"] = q.get("e") if q.get("e") in EBENEN else "alarm"
         eintrag["offen"] = q.get("o") == "1"
         eintrag["ton"] = q.get("t") == "1"
+        eintrag["hausalarm"] = q.get("h") == "1"
+        eintrag["erklaeren"] = q.get("x") == "1"
         eintrag["info"] = str(q.get("i", ""))[:60]  # z. B. welche Laufkarte gerade offen ist
         if "l" in q:  # die Anzeige schickt ihren Text nur mit, wenn er sich geändert hat
             eintrag["lcd"] = [zeile[:48] for zeile in str(q.get("l", ""))[:700].split("\n")[:12]]

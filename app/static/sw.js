@@ -20,6 +20,7 @@ self.addEventListener("fetch", function (event) {
   if (request.method !== "GET") return;
   var url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf("/static/ton/") === 0) return;  // Töne lädt der Browser in Teilen (Range); die gehören nicht in den Zwischenspeicher
   if (url.pathname.indexOf("/static/") === 0) {
     // Erst aus dem Zwischenspeicher antworten, im Hintergrund auffrischen
     event.respondWith(caches.open(CACHE).then(function (cache) {

@@ -3,6 +3,7 @@
 Aufruf:  python tests/smoke_test.py
 """
 import datetime as dt
+import json
 import logging
 import os
 import re
@@ -17,7 +18,7 @@ sys.path.insert(0, ROOT)
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import db as m  # noqa: E402
-from app import access, backup, katalog, laufkarte, live, sim  # noqa: E402
+from app import access, backup, katalog, laufkarte, live, sim, szenario  # noqa: E402
 from app.main import app  # noqa: E402
 from app.version import VERSION  # noqa: E402
 
@@ -84,6 +85,30 @@ v = st["v"]
 sim.grundstellung(st, log)
 assert sim.sicht(st)["normal"] and st["v"] > v
 
+# Historie, Brandfallsteuerungen im Brandmeldezustand, geplante Störungen und Abschaltungen
+st, log = sim.neu(), []
+sim.alarm(st, ziel, log, now)
+sim.schalter(st, "bfs_ab", log, "FBF")
+assert not st["bfs_ab"] and "nicht möglich" in log[-1][1], "DIN 14661: nicht im Brandmeldezustand"
+sim.ruecksetzen(st, log, now, "FBF")
+sim.schalter(st, "bfs_ab", log, "FBF")
+assert st["bfs_ab"]
+sim.schalter(st, "bfs_ab", log, "FBF")
+assert [h["art"] for h in st["historie"]] == ["alarm", "rueck"], "die Historie behält rückgestellte Meldungen"
+sim.planen(st, {"gruppe": None}, now, 5, aktion="stoerung", text="Netzausfall", quelle="Szenario Test")
+sim.planen(st, ziel, now, 5, aktion="abschaltung")
+sim.planen(st, {}, now, 5, aktion="loeschanlage")
+sim.planen(st, ziel, now, 5, aktion="unsinn")
+assert len(st["geplant"]) == 3 and sim.tick(st, log, now + dt.timedelta(seconds=5))
+assert [x["art"] for x in st["meldungen"]] == ["stoerung", "abschaltung"] and st["loesch"] and st["meldungen"][0]["ort"] == "Netzausfall"
+assert ("Szenario Test", "Störung Netzausfall") in log
+sim.grundstellung(st, log)
+assert st["historie"] == [] and sim.ergaenzen({"v": 3, "meldungen": []})["historie"] == []
+for _ in range(sim.MAX_HISTORIE + 20):
+    sim.stoerung(st, "x", log, now, gruppe=None)
+    sim.entfernen(st, st["meldungen"][-1]["id"], log)
+assert len(st["historie"]) == sim.MAX_HISTORIE
+
 # Melderliste lesen
 zeilen, fehler = katalog.lesen("Gruppe;Melder;Typ;Etage;Gruppenname;Ort\r\n1;1;hfm;EG;Eingang;Windfang\r\n1;2;Rauchmelder;EG;Eingang;Flur\r\n")
 assert not fehler and [z["typ"] for z in zeilen] == ["hfm", "rm"]
@@ -141,10 +166,10 @@ with TestClient(app, base_url="http://testserver") as c:
     r = c.get(f"/objekte/{oid}")
     assert f"/a/{token}" in r.text and 'data-melder="%d"' % ids[(5, 1)] in r.text and "FIZ am Tor" in r.text
     assert c.get(f"/objekte/{oid}/qr.svg").headers["content-type"].startswith("image/svg")
-    kopf = {"X-CSRF": tok}
+    csrf_kopf = {"X-CSRF": tok}
 
     def akt(**body):
-        return c.post(f"/objekte/{oid}/aktion", json=body, headers=kopf)
+        return c.post(f"/objekte/{oid}/aktion", json=body, headers=csrf_kopf)
 
     assert c.post(f"/objekte/{oid}/aktion", json={"aktion": "grundstellung"}).status_code == 403, "CSRF"
     assert akt(aktion="alarm", melder_id=fremd).status_code == 404, "Melder eines anderen Objekts"
@@ -350,6 +375,62 @@ with TestClient(app, base_url="http://testserver") as c:
     assert "/static/icons/logo-96.png" in c.get("/").text
     assert 'id="app-install"' in c.get("/konto").text and "als App installieren" in c.get(f"/objekte/{oid}").text
     assert "Gibt es den Simulator als App" in c.get("/hilfe").text
+    # Szenarien
+    r = c.get(f"/objekte/{oid}/szenarien")
+    assert "noch kein Szenario" in r.text and "Erstes Szenario anlegen" in r.text
+    assert "Szenario starten" not in c.get(f"/objekte/{oid}").text
+    def schritt_form(*zeilen):
+        return {"sek": [z[0] for z in zeilen], "aktion": [z[1] for z in zeilen], "ziel": [z[2] for z in zeilen],
+                "text": [z[3] for z in zeilen], "ansteht": [z[4] for z in zeilen]}
+    r = c.post(f"/objekte/{oid}/szenarien/speichern", data={"csrf": tok, "id": "", "name": "Test <b>", "beschreibung": "",
+                                                           **schritt_form((60, "alarm", "6/0", "", "1"), (0, "alarm", "99/1", "", "0"), (9999, "alarm", "5/1", "", "0"))})
+    assert "Nicht gespeichert" in r.text and "Melder wählen" in r.text and "zwischen 0 und 3600" in r.text
+    r = c.post(f"/objekte/{oid}/szenarien/speichern", data={"csrf": tok, "id": "", "name": "Test <b>", "beschreibung": "Übung",
+                                                           **schritt_form((60, "abschaltung", "6/0", "egal", "1"), (0, "alarm", "5/1", "", "1"),
+                                                                          (30, "stoerung", "0/0", "Netzausfall", "0"), (90, "loeschanlage", "6/2", "", "1"))})
+    assert "mit 4 Schritten gespeichert" in r.text and "Test &lt;b&gt;" in r.text and "Abschaltung 0006 Büro" in r.text
+    assert "Störung der Anlage: Netzausfall" in r.text and "0:30" in r.text and "1:30" in r.text
+    with m.SessionLocal() as db:
+        sz = db.query(m.Szenario).filter_by(objekt_id=oid).one()
+        sid = sz.id
+        abl = szenario.schritte(sz)
+        assert [x["sek"] for x in abl] == [0, 30, 60, 90] and abl[0]["ansteht"] and not abl[2]["ansteht"] and abl[2]["text"] == ""
+        assert abl[3] == {"sek": 90, "aktion": "loeschanlage", "g": 0, "m": 0, "text": "", "ansteht": False}
+        fremd_sz = db.query(m.Szenario).filter(m.Szenario.objekt_id != oid).first().id
+    assert "Szenario starten" in c.get(f"/objekte/{oid}").text and c.get(f"/szenarien/{sid}/bearbeiten").status_code == 200
+    assert akt(aktion="szenario", id=fremd_sz).status_code == 404, "Szenario eines anderen Objekts"
+    d = akt(aktion="szenario", id=sid).json()
+    assert d["sicht"]["alarme"] == 1 and len(d["st"]["geplant"]) == 3 and "gestartet: 4 Schritte über 90 s" in " ".join(z["text"] for z in d["protokoll"])
+    assert {p.get("quelle") for p in d["st"]["geplant"]} == {"Szenario Test <b>"}
+    with m.SessionLocal() as db:  # Uhr vorstellen statt warten
+        o = db.get(m.Objekt, oid)
+        st_roh = json.loads(o.state)
+        for p_ in st_roh["geplant"]:
+            p_["faellig"] = "2000-01-01T00:00:00Z"
+        o.state = json.dumps(st_roh)
+        db.commit()
+    d = c.get(f"/objekte/{oid}/state?v=0").json()
+    assert not d["st"]["geplant"] and d["sicht"]["stoerungen"] == 1 and d["sicht"]["abschaltungen"] == 1 and d["st"]["loesch"]
+    akt(aktion="grundstellung")
+    with TestClient(app, base_url="http://testserver") as gast:
+        fat = gast.get(f"/a/{token}/fat").text
+        assert "erste<br>Meldung" in fat and "&gt; 5 s: Historie" in fat and "&gt; 5 s: Test" in fat and 'data-led="brand"' in fat
+        assert "ÜE Nr." in fat and "Bedienfeld<br>in Betrieb" in fat and 'id="erklaeren"' in fat and 'id="hausalarm"' in fat
+        assert 'id="erklaeren"' not in gast.get(f"/a/{token}/bmz").text
+        for ton in ("summer.wav", "hausalarm.wav"):
+            r = gast.get(f"/static/ton/{ton}")
+            assert r.status_code == 200 and r.content[:4] == b"RIFF"
+        assert "MIT License" in gast.get("/static/ton/LIZENZ.txt").text
+        h = gast.get(f"/a/{token}/state").json()["st"]["historie"]
+        assert h == [], "Grundstellung leert die Historie"
+    # Szenario übersteht das Kopieren; fehlende Melder werden beim Start übersprungen
+    with m.SessionLocal() as db:
+        o = db.get(m.Objekt, oid)
+        st_test, log_test = sim.neu(), []
+        sz = db.get(m.Szenario, sid)
+        sz.schritte = json.dumps(szenario.schritte(sz) + [{"sek": 5, "aktion": "alarm", "g": 77, "m": 1, "text": "", "ansteht": False}])
+        assert szenario.starten(st_test, o, sz, log_test, m.utcnow(), "Ausbilder") == 4 and "fehlt in der Melderliste" in log_test[0][1]
+        db.rollback()
 
     # Adresse erneuern, kopieren, löschen
     c.post(f"/objekte/{oid}/link-erneuern", data={"csrf": tok})
@@ -360,6 +441,7 @@ with TestClient(app, base_url="http://testserver") as c:
         kopie = db.query(m.Objekt).filter(m.Objekt.name.like("%(Kopie)")).one()
         assert sum(len(g.melder) for g in kopie.gruppen) == 5 and kopie.token != token
         assert len(kopie.plaene) == 3 and kopie.fiz_etage == "OG" and all(x.px is not None for g in kopie.gruppen for x in g.melder)
+        assert [sz.name for sz in kopie.szenarien] == ["Test <b>"]
         kid = kopie.id
     assert c.post(f"/melder/{ids[(7, 1)]}/loeschen", data={"csrf": tok}).status_code == 200
     with m.SessionLocal() as db:
@@ -367,6 +449,11 @@ with TestClient(app, base_url="http://testserver") as c:
     assert "gelöscht" in c.post(f"/gruppen/{gid[6]}/loeschen", data={"csrf": tok}).text
     assert "gelöscht" in c.post(f"/objekte/{kid}/loeschen", data={"csrf": tok}).text
     assert c.get(f"/objekte/{kid}").status_code == 404
+    assert "gelöscht" in c.post(f"/szenarien/{sid}/loeschen", data={"csrf": tok}).text
+    with m.SessionLocal() as db:
+        beispiel = db.get(m.Objekt, 1)
+        assert [sz.name for sz in beispiel.szenarien] == ["Brand Zimmer 101 mit Ausbreitung", "Nacht mit Störung", "Täuschungsalarm Küche"]
+        assert all("fehlt" not in szenario.beschreiben(beispiel, s) for sz in beispiel.szenarien for s in szenario.schritte(sz))
 
     # Benutzer und Rechte
     assert c.get("/hilfe").status_code == 200 and "Rolle: Administrator" in c.get("/konto").text

@@ -4,7 +4,7 @@
   var root = document.getElementById("leitstand");
   if (!root) return;
   var id = root.dataset.id, csrf = root.dataset.csrf, v = 0, pv = "", st = null, steuern = root.dataset.steuern === "1";
-  var EBENEN = { alarm: "Alarm", stoerung: "Störung", abschaltung: "Abschaltung" };
+  var EBENEN = { alarm: "Alarm", stoerung: "Störung", abschaltung: "Abschaltung", historie: "Historie" };
   var ARTEN = { alarm: "Feuer", stoerung: "Störung", abschaltung: "Abschaltung" };
   var TYPEN = { rm: "Rauchmelder", wm: "Wärmemelder", mm: "Mehrkriterienmelder", fm: "Flammenmelder", gm: "Gasmelder",
     lm: "Linearer Rauchmelder", ras: "Rauchansaugsystem", hfm: "Handfeuermelder", spr: "Sprinklergruppe" };
@@ -153,7 +153,9 @@
         var marken = el("div", "marken");
         marken.appendChild(el("span", "tag", "Ebene: " + (EBENEN[g.ebene] || g.ebene)));
         marken.appendChild(el("span", "tag" + (g.offen ? " gesendet" : ""), g.geraet === "fat" ? (g.offen ? "FBF aufgeschlossen" : "FBF verschlossen") : (g.offen ? "Bedienung frei" : "Bedienung gesperrt")));
-        marken.appendChild(el("span", "tag" + (g.ton ? "" : " test"), g.ton ? "Ton an" : "Ton aus"));
+        marken.appendChild(el("span", "tag" + (g.ton ? "" : " test"), g.ton ? "Summer-Ton an" : "Summer-Ton aus"));
+        if (g.hausalarm) marken.appendChild(el("span", "tag", "Hausalarm an"));
+        if (g.erklaeren) marken.appendChild(el("span", "tag test", "Erklärmodus"));
         k.appendChild(marken);
       }
       if (g.info) k.appendChild(el("div", "letzte", g.info));
@@ -190,6 +192,7 @@
     if (akt) {
       var body = { aktion: akt.dataset.aktion };
       if (body.aktion === "loeschanlage") body.an = !(st && st.loesch);
+      if (body.aktion === "szenario") body.id = Number($("#szenario-wahl").value);
       senden(body);
       return;
     }

@@ -1,6 +1,7 @@
 """Melderliste eines Objekts: Einlesen und Ausgeben als CSV, Beispielobjekte."""
 import csv
 import io
+import json
 
 from . import db as m
 from .sim import TYPEN
@@ -109,6 +110,14 @@ def etagen(objekt: m.Objekt) -> list[str]:
 BEISPIELE = [
     {"name": "Seniorenheim Am Musterpark", "adresse": "Parkstraße 12, 12345 Musterstadt", "bma_nr": "BMA 017",
      "hinweis": "FIZ im Windfang Haupteingang. Nachts eine Pflegekraft je Wohnbereich.", "loeschanlage": False,
+     "szenarien": [
+         ("Brand Zimmer 101 mit Ausbreitung", "Echter Brand im 1. OG: Der Rauch zieht in den Flur, nach zwei Minuten löst der Handfeuermelder aus.",
+          [(0, "alarm", 10, 3, "", True), (45, "alarm", 10, 2, "", True), (120, "alarm", 10, 1, "", True)]),
+         ("Täuschungsalarm Küche", "Wasserdampf in der Großküche. Ursache beseitigt, die Anlage lässt sich zurückstellen.",
+          [(0, "alarm", 3, 1, "", False)]),
+         ("Nacht mit Störung", "Erst fällt ein Melder im Keller aus, dann löst im 2. OG ein Rauchmelder aus.",
+          [(0, "stoerung", 30, 1, "Melder verschmutzt", False), (60, "alarm", 20, 4, "", True)]),
+     ],
      "liste": """
 1;1;hfm;EG;Haupteingang;Windfang
 1;2;hfm;EG;Haupteingang;Flur Verwaltung
@@ -141,7 +150,12 @@ BEISPIELE = [
 """},
     {"name": "Möbelhaus Wohnwelt", "adresse": "Industriestraße 4, 12345 Musterstadt", "bma_nr": "BMA 023",
      "hinweis": "Sprinkleranlage in Verkauf und Lager. Sprinklerzentrale im EG neben der Warenannahme.",
-     "loeschanlage": True, "liste": """
+     "loeschanlage": True,
+     "szenarien": [
+         ("Sprinkler im Hochregallager", "Das Ansaugsystem meldet zuerst, kurz darauf löst die Sprinklergruppe aus.",
+          [(0, "alarm", 21, 2, "", True), (40, "alarm", 20, 1, "", True)]),
+     ],
+     "liste": """
 1;1;hfm;EG;Eingang Kunden;Windfang
 1;2;hfm;EG;Eingang Kunden;Kassenzone
 2;1;spr;EG;Sprinkler Verkauf EG;Verkaufsfläche EG
@@ -203,6 +217,35 @@ BEISPIELE = [
 ]
 
 
+def _szenarien_von(b: dict) -> list:
+    return [m.Szenario(name=name, beschreibung=text, schritte=json.dumps([
+        {"sek": sek, "aktion": aktion, "g": g, "m": nummer, "text": t, "ansteht": ansteht} for sek, aktion, g, nummer, t, ansteht in ablauf]))
+        for name, text, ablauf in b.get("szenarien", [])]
+
+
+def beispielszenarien_nachtragen(db) -> int:
+    """Für Installationen von vor Version 1.5: Die Beispielobjekte bekommen ihre Szenarien, sofern sie noch keine haben
+    und alle Melder darin noch vorhanden sind. Läuft nur einmal (Merker im Datenverzeichnis)."""
+    import os
+    merker = os.path.join(m.DATA_DIR, ".beispielszenarien")
+    if os.path.exists(merker):
+        return 0
+    anzahl = 0
+    for b in BEISPIELE:
+        for objekt in db.query(m.Objekt).filter(m.Objekt.name == b["name"]).all():
+            if objekt.szenarien:
+                continue
+            vorhanden = {(g.nummer, x.nummer) for g in objekt.gruppen for x in g.melder}
+            neu = [sz for sz in _szenarien_von(b)
+                   if all((s["g"], s["m"]) in vorhanden or not s["g"] for s in json.loads(sz.schritte))]
+            objekt.szenarien.extend(neu)
+            anzahl += len(neu)
+    db.commit()
+    with open(merker, "w", encoding="utf-8") as datei:
+        datei.write("Beispielszenarien wurden eingetragen.\n")
+    return anzahl
+
+
 def beispiele_anlegen(db) -> int:
     for b in BEISPIELE:
         objekt = m.Objekt(name=b["name"], adresse=b["adresse"], bma_nr=b["bma_nr"], hinweis=b["hinweis"],
@@ -211,5 +254,6 @@ def beispiele_anlegen(db) -> int:
         zeilen, fehler = lesen(b["liste"])
         assert not fehler, fehler
         uebernehmen(db, objekt, zeilen, ersetzen=False)
+        objekt.szenarien.extend(_szenarien_von(b))
     db.commit()
     return len(BEISPIELE)

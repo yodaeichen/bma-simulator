@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Hilfe</h1>
-<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#laufkarten">Laufkarten</a> &middot; <a href="#live">Live-Bild</a> &middot; <a href="#rechte">Benutzer und Sicherung</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
+<p class="helpnav"><a href="#ablauf">Ablauf einer Übung</a> &middot; <a href="#geraete">Die Geräte</a> &middot; <a href="#szenarien">Szenarien</a> &middot; <a href="#objekte">Objekte anlegen</a> &middot; <a href="#laufkarten">Laufkarten</a> &middot; <a href="#live">Live-Bild</a> &middot; <a href="#rechte">Benutzer und Sicherung</a> &middot; <a href="#fragen">Häufige Fragen</a></p>
 
 <div class="card" id="ablauf">
   <h2>Ablauf einer Übung</h2>
@@ -19,14 +19,28 @@
   <table>
     <tr><th>Gerät</th><th>Was es zeigt und kann</th></tr>
     <tr><td><strong>FAT</strong><br>Feuerwehr-Anzeigetableau</td><td>Vier Zeilen zu 20 Zeichen. Oben steht immer die erste Meldung, darunter die letzte; mit den Pfeilen blättert man durch die übrigen.
-      „Anzeigeebene“ wechselt zwischen Alarmen, Störungen und Abschaltungen. „Summer ab“ stellt nur den Summer ab.</td></tr>
-    <tr><td><strong>FBF</strong><br>Feuerwehr-Bedienfeld</td><td>Erst aufschließen. „Akustische Signale ab“, „Brandfall-Steuerungen ab“ und „ÜE ab“ schalten bei jedem Druck um, die gelbe Lampe zeigt den Zustand.
-      „ÜE prüfen“ löst die Übertragung zur Leitstelle aus. „BMZ rückstellen“ löscht die Alarme.</td></tr>
+      „Anzeigeebene“ wechselt zwischen Alarmen, Störungen und Abschaltungen, länger als 5 Sekunden gehalten zeigt es die Historie.
+      „Summer ab“ stellt den Summer ab, länger als 5 Sekunden gehalten startet es den Anzeigetest. Ohne Bedienung springt die Anzeige nach 20 Sekunden zurück.</td></tr>
+    <tr><td><strong>FBF</strong><br>Feuerwehr-Bedienfeld</td><td>Erst aufschließen. „Akustische Signale ab“, „Brandfall-Steuerung ab“ und „ÜE ab“ schalten bei jedem Druck um, die Taste leuchtet gelb, solange abgeschaltet ist.
+      Brandfallsteuerungen lassen sich nur abschalten, solange die BMA nicht im Brandmeldezustand ist. „ÜE Nr. … prüfen“ löst die Übertragung zur Leitstelle aus.
+      „BMZ rückstellen“ leuchtet rot im Brandmeldezustand und löscht die Alarme.</td></tr>
     <tr><td><strong>BMZ</strong><br>Brandmelderzentrale</td><td>Alle Meldungen mit Uhrzeit, Melderart und vollem Ort. Rückstellen geht erst nach „Bedienung freigeben“.</td></tr>
     <tr><td><strong>Meldergruppen</strong></td><td>Verzeichnis aller Gruppen und Melder des Objekts, zum Nachschlagen oder Ausdrucken.</td></tr>
     <tr><td><strong>Laufkarten</strong></td><td>Je Meldergruppe eine Karte: vorn der Laufweg von der FIZ, hinten die Lage der Melder. Nach Nummern geordnet wie im Laufkartendepot.</td></tr>
   </table>
-  <p class="hint">FAT und FBF sind in Aufbau und Beschriftung an DIN 14662 und DIN 14661 angelehnt. Die BMZ ist ein allgemeines Bedienteil ohne Vorbild eines bestimmten Herstellers.</p>
+  <p>In der Leiste der Anzeige: „Summer-Ton ein“ macht den Summer hörbar, „Hausalarm ein“ spielt den Räumungsalarm, solange die akustischen Signale laufen.
+    „Erklären“ erklärt jedes Bedienelement von FAT und FBF beim Antippen, statt es auszulösen.</p>
+  <p class="hint">FAT und FBF sind in Aufbau und Beschriftung an DIN 14662 und DIN 14661 angelehnt, nach dem Vorbild des Simulators safetydaysBMA (safety days 2019, Institut der Feuerwehr NRW). Die BMZ ist ein allgemeines Bedienteil ohne Vorbild eines bestimmten Herstellers.</p>
+</div>
+
+<div class="card" id="szenarien">
+  <h2>Szenarien</h2>
+  <ol class="steps">
+    <li>Beim Objekt „Szenarien“ öffnen und „Neues Szenario“ wählen.</li>
+    <li>Je Schritt eintragen: Zeit nach dem Start in Sekunden, was passiert (Alarm, Störung, Abschaltung, Löschanlage) und wo. „Ursache steht an“ lässt einen Alarm nach dem Rückstellen wiederkommen.</li>
+    <li>In der Übung das Szenario auswählen und „Szenario starten“ drücken. Die Schritte stehen dann unter „Aktive Meldungen“ als vorgemerkt.</li>
+  </ol>
+  <p class="hint">Die Beispielobjekte bringen Szenarien mit, zum Beispiel einen Brand mit Ausbreitung und einen Täuschungsalarm.</p>
 </div>
 
 <div class="card" id="objekte">

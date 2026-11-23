@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import db as m
-from . import access, backup, katalog, laufkarte, live, sim
+from . import access, backup, katalog, laufkarte, live, sim, szenario
 from . import security as sec
 from .version import VERSION
 
@@ -56,6 +56,9 @@ async def lifespan(_app):
                 for objekt in db.scalars(select(m.Objekt)).all():
                     laufkarte.schema_erzeugen(db, objekt)
                 db.commit()
+        anzahl = katalog.beispielszenarien_nachtragen(db)
+        if anzahl:
+            log.info("%s Beispielszenarien für die Beispielobjekte nachgetragen.", anzahl)
     log.info("BMA Simulator %s gestartet.", VERSION)
     task = asyncio.create_task(sicherung_schleife())
     yield
@@ -219,7 +222,7 @@ def zahl(value, low: int, high: int, default: int = 0) -> int:
 # ---------- Zustand der Anlage ----------
 
 def laden(objekt: m.Objekt) -> dict:
-    return json.loads(objekt.state) if objekt.state else sim.neu()
+    return sim.ergaenzen(json.loads(objekt.state)) if objekt.state else sim.neu()
 
 
 def aendern(db: Session, objekt: m.Objekt, fn=None) -> dict:
@@ -395,6 +398,8 @@ async def objekt_kopieren(oid: int, request: Request, user: m.User = Depends(all
                                     melder=[m.Melder(nummer=x.nummer, typ=x.typ, ort=x.ort, px=x.px, py=x.py) for x in g.melder]))
     for plan in o.plaene:
         neu.plaene.append(m.Plan(etage=plan.etage, mime=plan.mime, daten=plan.daten, schema=plan.schema))
+    for sz in o.szenarien:
+        neu.szenarien.append(m.Szenario(name=sz.name, beschreibung=sz.beschreibung, schritte=sz.schritte))
     db.add(neu)
     db.flush()
     freigeben(user, neu)
@@ -588,6 +593,11 @@ async def leitstand_aktion(oid: int, request: Request, user: m.User = Depends(al
         fn = lambda st, eintraege, now: sim.entfernen(st, zahl(data.get("id"), 0, 2**31), eintraege, wer)  # noqa: E731
     elif aktion == "ursache":
         fn = lambda st, eintraege, now: sim.ursache(st, zahl(data.get("id"), 0, 2**31), bool(data.get("ansteht")), eintraege, wer)  # noqa: E731
+    elif aktion == "szenario":
+        sz = db.get(m.Szenario, zahl(data.get("id"), 1, 2**31, 0))
+        if sz is None or sz.objekt_id != o.id:
+            raise HTTPException(404, "Szenario nicht gefunden")
+        fn = lambda st, eintraege, now: szenario.starten(st, o, sz, eintraege, now, wer)  # noqa: E731
     elif aktion == "loeschanlage":
         fn = lambda st, eintraege, now: sim.loeschanlage(st, bool(data.get("an")), eintraege, wer)  # noqa: E731
     elif aktion == "schalter":
@@ -632,6 +642,74 @@ async def protokoll_leeren(oid: int, request: Request, user: m.User = Depends(al
     db.commit()
     aendern(db, o, lambda st, eintraege, now: eintraege.append((f"Ausbilder {user.username}", "Protokoll geleert")))
     return go(f"/objekte/{oid}")
+
+
+# ---------- Szenarien ----------
+
+def szenario_for(db: Session, user: m.User, sid: int) -> m.Szenario:
+    sz = need(db.get(m.Szenario, sid))
+    objekt_for(db, user, sz.objekt_id)
+    return sz
+
+
+@app.get("/objekte/{oid}/szenarien")
+def szenarien(oid: int, request: Request, user: m.User = Depends(allow("uebung:1")), db: Session = Depends(get_db)):
+    o = objekt_for(db, user, oid)
+    liste = [{"sz": sz, "schritte": [(s.get("sek", 0), szenario.beschreiben(o, s)) for s in szenario.schritte(sz)]} for sz in o.szenarien]
+    return page(request, "szenarien.html", user, o=o, liste=liste)
+
+
+def szenario_formular(request: Request, user: m.User, o: m.Objekt, sz: m.Szenario | None):
+    zeilen = szenario.schritte(sz) if sz else [{"sek": 0, "aktion": "alarm", "g": 0, "m": 0, "text": "", "ansteht": False}]
+    return page(request, "szenario_form.html", user, o=o, sz=sz, zeilen=zeilen, aktionen=sim.AKTIONEN)
+
+
+@app.get("/objekte/{oid}/szenarien/neu")
+def szenario_neu(oid: int, request: Request, user: m.User = Depends(allow("uebung:2")), db: Session = Depends(get_db)):
+    return szenario_formular(request, user, objekt_for(db, user, oid), None)
+
+
+@app.get("/szenarien/{sid}/bearbeiten")
+def szenario_bearbeiten(sid: int, request: Request, user: m.User = Depends(allow("uebung:2")), db: Session = Depends(get_db)):
+    sz = szenario_for(db, user, sid)
+    return szenario_formular(request, user, sz.objekt, sz)
+
+
+@app.post("/objekte/{oid}/szenarien/speichern")
+async def szenario_speichern(oid: int, request: Request, user: m.User = Depends(allow("uebung:2")), db: Session = Depends(get_db)):
+    form = await read_form(request)
+    o = objekt_for(db, user, oid)
+    sid = text(form, "id", 12)
+    sz = szenario_for(db, user, int(sid)) if sid.isdigit() else None
+    if sz is not None and sz.objekt_id != o.id:
+        raise HTTPException(404, "Nicht gefunden")
+    name = text(form, "name", 120)
+    schritte, fehler = szenario.aus_formular(o, form)
+    if not name:
+        fehler.insert(0, "Bitte einen Namen eintragen.")
+    if not schritte and not fehler:
+        fehler.append("Bitte mindestens einen Schritt anlegen.")
+    if fehler:
+        flash(request, "Nicht gespeichert. " + " ".join(fehler[:5]), "err")
+        return go(f"/szenarien/{sz.id}/bearbeiten" if sz else f"/objekte/{oid}/szenarien/neu")
+    if sz is None:
+        sz = m.Szenario(name=name)
+        o.szenarien.append(sz)
+    sz.name, sz.beschreibung, sz.schritte = name, text(form, "beschreibung", 1000), json.dumps(schritte)
+    db.commit()
+    flash(request, f"Szenario „{name}“ mit {len(schritte)} Schritten gespeichert.")
+    return go(f"/objekte/{oid}/szenarien")
+
+
+@app.post("/szenarien/{sid}/loeschen")
+async def szenario_loeschen(sid: int, request: Request, user: m.User = Depends(allow("uebung:2")), db: Session = Depends(get_db)):
+    await read_form(request)
+    sz = szenario_for(db, user, sid)
+    oid = sz.objekt_id
+    db.delete(sz)
+    db.commit()
+    flash(request, f"Szenario „{sz.name}“ gelöscht.")
+    return go(f"/objekte/{oid}/szenarien")
 
 
 # ---------- Laufkarten ----------

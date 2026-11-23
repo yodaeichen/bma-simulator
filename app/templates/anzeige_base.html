@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="robots" content="noindex">
 <title>{% block title %}{{ o.name }}{% endblock %}</title>
-<link rel="stylesheet" href="/static/anzeige.css?v=3">
+<link rel="stylesheet" href="/static/anzeige.css?v=4">
 {% if self.bodyclass() == 'seite-laufkarten' %}<link rel="stylesheet" href="/static/laufkarte.css?v=2">{% endif %}
 </head>
 <body class="{% block bodyclass %}{% endblock %}" data-wach>
@@ -24,7 +24,9 @@
     <a href="/a/{{ o.token }}/verzeichnis"{% if self.bodyclass() == 'seite-verzeichnis' %} aria-current="page"{% endif %}>Meldergruppen</a>
     <a href="/a/{{ o.token }}/laufkarten"{% if self.bodyclass() == 'seite-laufkarten' %} aria-current="page"{% endif %}>Laufkarten</a></nav>
   <span class="knoepfe"><button type="button" id="vollbild" aria-pressed="false" hidden>Vollbild</button>
-  {% block leiste %}<button type="button" id="ton" aria-pressed="false">Ton ein</button>{% endblock %}</span>
+  {% block leiste %}<button type="button" id="ton" aria-pressed="false" title="Summer des Geräts hörbar machen">Summer-Ton ein</button>
+  <button type="button" id="hausalarm" aria-pressed="false" title="Räumungsalarm im Gebäude nachahmen, solange die akustischen Signale laufen">Hausalarm ein</button>
+  {% if self.bodyclass() == 'seite-fat' %}<button type="button" id="erklaeren" aria-pressed="false" title="Tippen auf ein Bedienelement erklärt es, statt es auszulösen">Erklären</button>{% endif %}{% endblock %}</span>
 </div>
 <div class="offline" id="offline" hidden>Keine Verbindung zur Anlage</div>
 {% block content %}{% endblock %}

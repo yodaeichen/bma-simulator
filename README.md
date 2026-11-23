@@ -12,6 +12,7 @@ Aktuelle Version und Änderungen: siehe [CHANGELOG.md](CHANGELOG.md). Die laufen
 | **Objekte** | Ausbilder | Übersicht aller Objekte mit ihrem Zustand |
 | **Übung** (Ausbilderansicht) | Ausbilder | Melder nach Etagen und Gruppen, auslösen, stören, abschalten; Zustand der Anlage; Live-Bild der Übenden; Protokoll |
 | **Melderliste** | Ausbilder | Gruppen und Melder eines Objekts anlegen, als CSV einlesen und herunterladen |
+| **Szenarien** | Ausbilder | Vorbereitete Übungsabläufe mit festen Zeitpunkten, in der Übung mit einem Klick gestartet |
 | **FAT und FBF** | Übende | Feuerwehr-Anzeigetableau und Feuerwehr-Bedienfeld |
 | **BMZ** | Übende | Anzeige- und Bedienteil der Brandmelderzentrale |
 | **Laufkarten** | Ausbilder | Pläne je Etage, Laufwege und Melder einzeichnen, alle Karten drucken |
@@ -39,6 +40,28 @@ Bedienteil ohne Vorbild eines bestimmten Herstellers. Der Simulator ersetzt kein
   Abgeschaltete Melder lösen nicht aus.
 - **Löschanlage:** Eine ausgelöste Sprinklergruppe setzt „Löschanlage ausgelöst".
 - **Übungsprotokoll:** Jede Auslösung und jede Bedienung mit Uhrzeit und Gerät, als CSV für die Nachbesprechung.
+- **Brandfallsteuerungen ab** geht nur, solange die BMA nicht im Brandmeldezustand ist.
+- **Historie:** Die Anlage merkt sich alle Meldungen seit der Grundstellung, auch rückgestellte.
+
+## FAT und FBF bedienen (ab Version 1.5)
+
+| Bedienelement | Kurz drücken | Länger als 5 Sekunden halten |
+|---|---|---|
+| ▲ / ▼ „weitere Meldungen" | blättert durch die Meldungen zwischen erster und letzter | – |
+| „Anzeigeebene" | Alarme → Störungen → Abschaltungen | Historie |
+| „Summer ab" | stellt den Summer des FAT ab | Anzeigetest (alle Leuchten, Anzeige, Summer) |
+
+Ohne Bedienung springt das FAT nach 20 Sekunden zurück auf erste und letzte Meldung. In der Leiste der Anzeige schalten
+„Summer-Ton ein" und „Hausalarm ein" die Töne auf diesem Gerät ein; der Hausalarm läuft, solange die akustischen Signale
+der BMA laufen. „Erklären" macht aus jedem Bedienelement von FAT und FBF eine Erklärung, statt es auszulösen.
+
+## Szenarien (ab Version 1.5)
+
+Ein Szenario ist ein vorbereiteter Ablauf für ein Objekt: Je Schritt ein Zeitpunkt nach dem Start, die Art (Alarm,
+Störung, Abschaltung, Löschanlage), der Melder oder die Gruppe und bei Alarmen, ob die Ursache ansteht. Angelegt werden
+Szenarien beim Objekt unter „Szenarien", gestartet in der Übung mit „Szenario starten". Die Melder sind über Gruppen- und
+Meldernummer gespeichert; ein Szenario übersteht deshalb das Kopieren des Objekts und das Neueinlesen der Melderliste.
+Fehlt ein Melder beim Start, wird der Schritt übersprungen und im Protokoll vermerkt.
 
 ## Als App auf Handy und Tablet (ab Version 1.3)
 
@@ -227,6 +250,13 @@ Gruppe;Melder;Typ;Etage;Gruppenname;Ort
 | `gm` | Gasmelder | | | |
 
 Das FAT zeigt vom Ort die ersten 20 Zeichen. Enthält eine Zeile einen Fehler, wird nichts übernommen.
+
+## Dank
+
+Aufbau von FAT und FBF, Anzeigetest, Historie, die Sperre der Brandfallsteuerungen und die Töne (Summer, Hausalarm)
+folgen dem BMA-Simulator [safetydaysBMA](https://github.com/safetydays/safetydaysBMA), entwickelt bei den safety days 2019
+in Zusammenarbeit mit dem Institut der Feuerwehr NRW. Die beiden Töne stehen unter der MIT-Lizenz, der Hinweis liegt in
+`app/static/ton/LIZENZ.txt`.
 
 ## Entwicklung
 

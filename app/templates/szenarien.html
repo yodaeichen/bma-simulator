@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Szenarien · {{ o.name }}{% endblock %}
+{% block content %}
+<div class="row"><h1>Szenarien: {{ o.name }}</h1>
+  <div>{% if perm.uebung == 2 %}<a class="btn" href="/objekte/{{ o.id }}/szenarien/neu">Neues Szenario</a>{% endif %}
+    <a class="btn light" href="/objekte/{{ o.id }}">{{ "Übung öffnen" if perm.uebung == 2 else "Übung ansehen" }}</a></div></div>
+<p class="hint">Ein Szenario ist ein vorbereiteter Übungsablauf: Alarme, Störungen und Abschaltungen mit festem Zeitpunkt nach dem Start.
+  Gestartet wird es in der Übung unter „Szenario starten“.</p>
+{% for e in liste %}
+<div class="card">
+  <div class="row"><h2>{{ e.sz.name }}</h2>
+    {% if perm.uebung == 2 %}<div><a class="btn light klein" href="/szenarien/{{ e.sz.id }}/bearbeiten">Bearbeiten</a>
+      <form class="inline" method="post" action="/szenarien/{{ e.sz.id }}/loeschen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link" data-frage="Szenario „{{ e.sz.name }}“ löschen?">Löschen</button></form></div>{% endif %}</div>
+  {% if e.sz.beschreibung %}<p>{{ e.sz.beschreibung }}</p>{% endif %}
+  <table class="ablauf">
+    {% for sek, text in e.schritte %}<tr><td>{{ "%d:%02d"|format(sek // 60, sek % 60) }}</td><td>{{ text }}</td></tr>{% endfor %}
+  </table>
+</div>
+{% else %}
+<div class="card"><p>Für dieses Objekt gibt es noch kein Szenario.</p>{% if perm.uebung == 2 %}<a class="btn" href="/objekte/{{ o.id }}/szenarien/neu">Erstes Szenario anlegen</a>{% endif %}</div>
+{% endfor %}
+<script src="/static/frage.js?v=1"></script>
+{% endblock %}

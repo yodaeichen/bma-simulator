@@ -20,13 +20,27 @@ TYPEN = {
     "spr": "Sprinklergruppe",
 }
 MAX_MELDUNGEN = 200
+MAX_HISTORIE = 100
 WIEDERAUSLOESUNG_SEK = 5
 
 
 def neu() -> dict:
-    return {"v": 1, "seq": 0, "meldungen": [], "geplant": [],
+    return {"v": 1, "seq": 0, "meldungen": [], "geplant": [], "historie": [],
             "ue": False, "ue_ab": False, "akustik_ab": False, "bfs_ab": False, "loesch": False,
             "summer_fat": False, "summer_bmz": False}
+
+
+def ergaenzen(st: dict) -> dict:
+    """Zustände aus älteren Versionen bekommen die Felder, die es damals noch nicht gab."""
+    for key, wert in neu().items():
+        st.setdefault(key, wert)
+    return st
+
+
+def _historie(st: dict, now: dt.datetime, art: str, gruppe=None, melder=None, ort: str = ""):
+    """Ereignisspeicher des FAT: bleibt beim Rückstellen erhalten, erst die Grundstellung leert ihn."""
+    st["historie"].append({"zeit": iso(now), "art": art, "gruppe": gruppe, "melder": melder, "ort": ort[:60]})
+    del st["historie"][:-MAX_HISTORIE]
 
 
 def iso(now: dt.datetime) -> str:
@@ -55,6 +69,7 @@ def _neue_meldung(st: dict, art: str, now: dt.datetime, **felder) -> dict:
                "ort": "", "gname": "", "etage": "", "ansteht": False}
     meldung.update(felder)
     st["meldungen"].append(meldung)
+    _historie(st, now, art, meldung["gruppe"], meldung["melder"], meldung["ort"] or meldung["gname"])
     st["summer_fat"] = st["summer_bmz"] = True
     st["v"] += 1
     return meldung
@@ -90,24 +105,42 @@ def alarm(st: dict, ziel: dict, log: list, now: dt.datetime, quelle: str = "Ausb
     return True
 
 
-def planen(st: dict, ziel: dict, now: dt.datetime, sekunden: int, ansteht: bool = False):
-    """Merkt eine Auslösung für später vor; ``tick`` führt sie aus."""
-    if len(st["geplant"]) >= 50:
+AKTIONEN = {"alarm": "Alarm", "stoerung": "Störung", "abschaltung": "Abschaltung", "loeschanlage": "Löschanlage"}
+
+
+def planen(st: dict, ziel: dict, now: dt.datetime, sekunden: int, ansteht: bool = False, aktion: str = "alarm",
+           text: str = "", quelle: str = ""):
+    """Merkt eine Auslösung (oder eine Störung, Abschaltung, Löschanlage) für später vor; ``tick`` führt sie aus."""
+    if len(st["geplant"]) >= 50 or aktion not in AKTIONEN:
         return
     faellig = iso(now + dt.timedelta(seconds=max(0, min(int(sekunden), 3600))))
-    st["geplant"].append({"faellig": faellig, "ziel": ziel, "ansteht": bool(ansteht)})
+    eintrag = {"faellig": faellig, "ziel": ziel, "ansteht": bool(ansteht)}
+    if aktion != "alarm":
+        eintrag.update(aktion=aktion, text=text[:60])
+    if quelle:
+        eintrag["quelle"] = quelle[:40]
+    st["geplant"].append(eintrag)
     st["v"] += 1
 
 
 def tick(st: dict, log: list, now: dt.datetime) -> bool:
-    """Führt fällige vorgemerkte Auslösungen aus. Liefert True, wenn sich etwas geändert hat."""
+    """Führt fällige vorgemerkte Schritte aus. Liefert True, wenn sich etwas geändert hat."""
     jetzt = iso(now)
     faellig = [p for p in st["geplant"] if p["faellig"] <= jetzt]
     if not faellig:
         return False
     st["geplant"] = [p for p in st["geplant"] if p["faellig"] > jetzt]
     for p in sorted(faellig, key=lambda p: p["faellig"]):
-        alarm(st, p["ziel"], log, now, quelle=p.get("quelle", "Ausbilder (verzögert)"), ansteht=p["ansteht"])
+        z, quelle, aktion = p["ziel"], p.get("quelle", "Ausbilder (verzögert)"), p.get("aktion", "alarm")
+        if aktion == "alarm":
+            alarm(st, z, log, now, quelle=quelle, ansteht=p["ansteht"])
+        elif aktion == "stoerung":
+            stoerung(st, p.get("text") or "Störung", log, now, gruppe=z.get("gruppe"), melder=z.get("melder"), quelle=quelle,
+                     ort=z.get("ort", "") if z.get("gruppe") else "", gname=z.get("gname", ""), etage=z.get("etage", ""))
+        elif aktion == "abschaltung" and z.get("gruppe"):
+            abschaltung(st, z["gruppe"], log, now, melder=z.get("melder"), gname=z.get("gname", ""), ort=z.get("ort", ""), quelle=quelle)
+        elif aktion == "loeschanlage":
+            loeschanlage(st, True, log, quelle)
     st["v"] += 1
     return True
 
@@ -176,6 +209,7 @@ def ruecksetzen(st: dict, log: list, now: dt.datetime, quelle: str):
     st["loesch"] = False
     st["summer_fat"] = st["summer_bmz"] = False
     st["v"] += 1
+    _historie(st, now, "rueck", ort="BMZ rückgestellt")
     log.append((quelle, "BMZ rückgestellt"))
     for m in bleibend:
         ziel = {k: m[k] for k in ("gruppe", "melder", "typ", "ort", "gname", "etage")}
@@ -187,6 +221,11 @@ def schalter(st: dict, name: str, log: list, quelle: str):
     """Die drei Schalter am FBF: akustik_ab, bfs_ab, ue_ab. Jeder Druck schaltet um."""
     texte = {"akustik_ab": "Akustische Signale", "bfs_ab": "Brandfallsteuerungen", "ue_ab": "ÜE"}
     if name not in texte:
+        return
+    if name == "bfs_ab" and not st["bfs_ab"] and alarme(st):
+        # DIN 14661: Brandfallsteuerungen lassen sich nur abschalten, solange kein Brandmeldezustand besteht
+        log.append((quelle, "Brandfallsteuerungen ab gedrückt: im Brandmeldezustand nicht möglich"))
+        st["v"] += 1
         return
     st[name] = not st[name]
     st["v"] += 1
